@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Colores institucionales oficiales (D6 RESUELTO):
+ *   primary:  #09488D
+ *   contrast: #FFFFFF
+ *   accent:   #F7C800
+ */
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { @apply bg-iu-light text-iu-dark; }
+}
+
+@layer components {
+  .card-gamified {
+    @apply bg-white rounded-2xl shadow-lg border border-iu-primary/10
+           p-6 transition-all duration-300 hover:shadow-xl animate-fade-in;
+  }
+  .badge-disponible {
+    @apply bg-iu-success/10 text-iu-success text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-prestado {
+    @apply bg-iu-primary/10 text-iu-primary text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-danado {
+    @apply bg-iu-danger/10 text-iu-danger text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-mantenimiento {
+    @apply bg-iu-warning/10 text-iu-warning text-xs font-medium px-2.5 py-0.5 rounded-full;
+  }
+  .badge-mora {
+    @apply bg-red-100 text-red-700 text-xs font-bold px-2.5 py-0.5 rounded-full animate-pulse;
+  }
+  .btn-primary {
+    @apply bg-iu-primary text-white font-semibold py-2 px-6 rounded-lg
+           hover:bg-iu-secondary transition-colors duration-200
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-accent {
+    @apply bg-iu-accent text-iu-dark font-semibold py-2 px-6 rounded-lg
+           hover:brightness-110 transition-all duration-200;
+  }
+  .btn-danger {
+    @apply bg-iu-danger text-white font-semibold py-2 px-6 rounded-lg
+           hover:brightness-110 transition-all duration-200;
+  }
+  .btn-ghost {
+    @apply text-iu-primary font-medium py-2 px-4 rounded-lg
+           hover:bg-iu-primary/5 transition-colors duration-200;
+  }
+}
+
+@layer utilities {
+  .gradient-iu {
+    @apply bg-gradient-to-r from-iu-primary to-iu-secondary;
+  }
+}
