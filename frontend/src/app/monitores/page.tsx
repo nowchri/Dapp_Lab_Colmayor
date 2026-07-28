@@ -67,6 +67,15 @@ export default function MonitoresPage() {
     }
   }
 
+  async function eliminarMonitor(id: string, nombre: string) {
+    if (!confirm(`\xbfEliminar a ${nombre}?`)) return;
+    try {
+      const res = await fetch(`/api/monitores/${id}`, { method: "DELETE" });
+      if (res.ok) { toast.success("Monitor eliminado"); cargarMonitores(); }
+      else { const e = await res.json(); toast.error(e.error || "Error"); }
+    } catch { toast.error("Error de conexion"); }
+  }
+
   if (loading) return <div className="p-8 text-center text-iu-gray">Cargando...</div>;
 
   return (
@@ -161,7 +170,11 @@ export default function MonitoresPage() {
                       {m.telefono && ` · ${m.telefono}`}
                     </p>
                   </div>
-                  <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">Activo</span>
+                  <button
+                    onClick={() => eliminarMonitor(m.id_perfil, m.nombre_completo)}
+                    className="text-xs px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100"
+                    title="Eliminar monitor"
+                  >🗑️ Eliminar</button>
                 </div>
               ))}
             </div>

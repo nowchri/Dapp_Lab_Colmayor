@@ -14,7 +14,7 @@ import type { NextRequest } from "next/server";
 const PUBLIC = ["/login", "/register", "/api/auth/login", "/api/auth/register", "/api/auth/logout"];
 
 // Rutas exclusivas de admin
-const ADMIN_ONLY = ["/reportes", "/monitores", "/configuracion"];
+const ADMIN_ONLY = ["/reportes", "/monitores", "/configuracion", "/estudiantes"];
 
 // Rutas de monitor (crear activos, aprobar, devolver)
 const MONITOR_PATHS = ["/inventario/registrar", "/prestamos/aprobar", "/prestamos/devolver"];

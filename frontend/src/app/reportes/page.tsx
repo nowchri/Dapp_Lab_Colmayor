@@ -2,151 +2,212 @@
 
 import { useEffect, useState } from "react";
 
-interface ReporteItem {
-  id_prestamo: string;
-  estudiante_nombre: string;
-  estudiante_correo: string | null;
-  fecha_limite: string;
-  nombre_completo: string;
-  monitor_nombre: string | null;
-  album_activo: boolean;
-  estado_general: string;
-  fecha_inicio: string;
-  materia: string | null;
+interface Stats {
+  total_activos: number; disponibles: number; prestados: number; danados: number;
+  prestamos_activos: number; devueltos: number; en_mora: number;
+  total_trazables: number; total_consumibles: number;
+  trazables_prestados: number; consumibles_prestados: number;
 }
 
-export default function ReportesPage() {
-  const [prestamos, setPrestamos] = useState<ReporteItem[]>([]);
-  const [stats, setStats] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Cargar todos los préstamos (admin ve todo)
-    fetch("/api/prestamos")
-      .then((r) => r.json())
-      .then(setPrestamos)
-      .catch(console.error)
-      .finally(() => setLoading(false));
-
-    // Cargar stats
-    fetch("/api/reports/stats")
-      .then((r) => r.json())
-      .then(setStats)
-      .catch(() => {});
-  }, []);
-
-  const vencidos = prestamos.filter((p: any) => {
-    if (p.estado_general !== "activo" && p.estado_general !== "mora") return false;
-    const limite = new Date(p.fecha_limite);
-    limite.setDate(limite.getDate() + 8);
-    return new Date() > limite;
-  });
-
-  if (loading) return <div className="p-8 text-center text-iu-gray">Cargando...</div>;
-
+function DonutRing({ value, total, color, label, sublabel }: { value: number; total: number; color: string; label: string; sublabel: string }) {
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  const circumference = 2 * Math.PI * 38;
+  const offset = circumference - (pct / 100) * circumference;
   return (
-    <div className="min-h-screen bg-iu-light p-6">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <h1 className="text-2xl font-bold text-iu-primary">📊 Reportes y Auditoría</h1>
-
-        {/* Stats dashboard (RF-20) */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Total Activos" value={stats.total_activos} color="iu-primary" />
-            <StatCard label="Disponibles" value={stats.disponibles} color="green" />
-            <StatCard label="Préstamos Activos" value={stats.prestamos_activos} color="iu-primary" />
-            <StatCard label="En Mora" value={stats.en_mora} color="red" />
-          </div>
-        )}
-
-        {/* Panel de Sanciones (RF-17) — estudiantes que superaron gracia */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-          <h2 className="font-bold text-iu-dark text-lg mb-1">🚨 Panel de Sanciones</h2>
-          <p className="text-sm text-iu-gray mb-4">
-            Estudiantes con préstamos activos que superaron el plazo + 8 días de gracia (Regla 4)
-          </p>
-
-          {vencidos.length === 0 ? (
-            <div className="text-center py-6 text-iu-gray text-sm">No hay estudiantes en mora.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-iu-gray border-b">
-                    <th className="py-2">Estudiante</th>
-                    <th className="py-2">Material</th>
-                    <th className="py-2">Materia</th>
-                    <th className="py-2">Profesor</th>
-                    <th className="py-2">Venció</th>
-                    <th className="py-2">Días</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vencidos.map((p: any) => {
-                    const limite = new Date(p.fecha_limite);
-                    limite.setDate(limite.getDate() + 8);
-                    const diasExtra = Math.ceil(
-                      (Date.now() - limite.getTime()) / (1000 * 60 * 60 * 24)
-                    );
-                    return (
-                      <tr key={p.id_prestamo} className="border-b border-gray-50">
-                        <td className="py-2 font-medium">{p.estudiante_nombre}</td>
-                        <td className="py-2 text-iu-gray">—</td>
-                        <td className="py-2">{p.materia || "—"}</td>
-                        <td className="py-2">{p.profesor_encargado || "—"}</td>
-                        <td className="py-2">{new Date(p.fecha_limite).toLocaleDateString("es-CO")}</td>
-                        <td className="py-2">
-                          <span className="text-red-600 font-bold">{diasExtra} d</span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+    <div className="flex flex-col items-center p-4">
+      <div className="relative w-28 h-28">
+        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+          <circle cx="50" cy="50" r="38" fill="none" stroke="#e5e7eb" strokeWidth="10" />
+          <circle cx="50" cy="50" r="38" fill="none" stroke={color} strokeWidth="10" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xl font-bold" style={{ color }}>{pct}%</span>
         </div>
+      </div>
+      <p className="text-sm font-semibold text-slate-700 mt-2">{label}</p>
+      <p className="text-xs text-slate-400">{value} de {total} {sublabel}</p>
+    </div>
+  );
+}
 
-        {/* Botón para exportar CSV (RF-12) */}
-        {prestamos.length > 0 && (
-          <div className="flex gap-3">
-            <button
-              onClick={() => {
-                // Export simple CSV de los datos actuales
-                const headers = "Estudiante,Cédula,Contacto,Material,Materia,Curso,Profesor,Fecha Límite\n";
-                const rows = prestamos.map((p: any) =>
-                  `"${p.estudiante_nombre}","","","","${p.materia||""}","","${p.profesor_encargado||""}","${new Date(p.fecha_limite).toLocaleDateString("es-CO ")}"`
-                ).join("\n");
-                const blob = new Blob([headers + rows], { type: "text/csv" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `reporte_prestamos.csv`;
-                a.click();
-              }}
-              className="btn-primary text-sm"
-            >
-              📥 Exportar CSV
-            </button>
-            <button onClick={() => alert("Exportar PDF: funcionalidad en desarrollo")} className="btn-ghost text-sm">
-              📄 Exportar PDF
-            </button>
-          </div>
-        )}
+function ProgressBar({ value, total, color, label }: { value: number; total: number; color: string; label: string }) {
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between text-xs">
+        <span className="text-slate-600">{label}</span>
+        <span className="text-slate-400">{value}/{total}</span>
+      </div>
+      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
+        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
     </div>
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: number; color: string }) {
-  let bg = "bg-iu-primary/10 text-iu-primary";
-  if (color === "green") bg = "bg-green-50 text-green-800";
-  else if (color === "red") bg = "bg-red-50 text-red-800";
+
+function BarChart({ trazables, consumibles, tPrestados, cPrestados }: { trazables: number; consumibles: number; tPrestados: number; cPrestados: number }) {
+  const max = Math.max(trazables, consumibles, 1);
+  const tPct = Math.round((tPrestados / max) * 100);
+  const cPct = Math.round((cPrestados / max) * 100);
+  return (
+    <div className="space-y-3">
+      <div>
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-slate-600">Trazables (QR)</span>
+          <span className="font-medium text-[#09488D]">{tPrestados} de {trazables}</span>
+        </div>
+        <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-full bg-[#09488D] rounded-full" style={{ width: tPct + '%' }} />
+        </div>
+      </div>
+      <div>
+        <div className="flex justify-between text-xs mb-1">
+          <span className="text-slate-600">Consumibles (Sin stock)</span>
+          <span className="font-medium text-amber-600">{cPrestados} de {consumibles}</span>
+        </div>
+        <div className="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-full bg-amber-400 rounded-full" style={{ width: cPct + '%' }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ReportesPage() {
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/reports/stats").then(r => r.json()).then(setStats).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F4F6F9]">
+      <div className="w-8 h-8 border-2 border-[#09488D] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+  if (!stats) return null;
+
+  const total = stats.total_activos || 1;
+  const prestados = stats.prestados || 0;
+  const danados = stats.danados || 0;
+  const disponibles = stats.disponibles || 0;
+  const mantenimiento = total - disponibles - prestados - danados;
+  const enMora = stats.en_mora || 0;
+  const devueltos = stats.devueltos || 0;
 
   return (
-    <div className={`rounded-xl p-5 ${bg}`}>
-      <p className="text-3xl font-bold">{value}</p>
-      <p className="text-xs mt-1">{label}</p>
+    <div className="min-h-screen bg-[#F4F6F9] pb-12">
+      <div className="bg-white border-b border-gray-100 px-6 py-6">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-[#09488D]">📊 Reportes y Analíticas</h1>
+            <span className="pill-primary">Admin</span>
+          </div>
+          <p className="text-sm text-slate-400 mt-1">Panel de control académico para seguimiento de inventario y préstamos del laboratorio.</p>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto mt-6 px-6 space-y-6">
+
+        {/* ─── SECTION 1: Asset Status Donuts ─── */}
+        <div className="card-glass">
+          <h2 className="font-bold text-[#09488D] mb-4">📦 Estado de los Activos</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <DonutRing value={disponibles} total={total} color="#10b981" label="Disponibles" sublabel="activos listos" />
+            <DonutRing value={prestados} total={total} color="#09488D" label="Prestados" sublabel="en circulación" />
+            <DonutRing value={danados} total={total} color="#ef4444" label="Dañados" sublabel="requieren atención" />
+            <DonutRing value={mantenimiento} total={total} color="#F7C800" label="Mantenimiento" sublabel="en reparación" />
+          </div>
+        </div>
+
+        {/* ─── SECTION 2: Loan Analytics ─── */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* KPI Blocks */}
+          <div className="card-glass space-y-4">
+            <h2 className="font-bold text-[#09488D]">📋 Métricas de Préstamos</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-[#09488D]/5 rounded-xl p-4 text-center">
+                <p className="text-3xl font-bold text-[#09488D]">{stats.prestamos_activos}</p>
+                <p className="text-xs text-slate-500 mt-1">Préstamos activos</p>
+              </div>
+              <div className="bg-emerald-50 rounded-xl p-4 text-center">
+                <p className="text-3xl font-bold text-emerald-600">{devueltos}</p>
+                <p className="text-xs text-slate-500 mt-1">Devueltos</p>
+              </div>
+              <div className="bg-rose-50 rounded-xl p-4 text-center">
+                <p className="text-3xl font-bold text-rose-600">{enMora}</p>
+                <p className="text-xs text-slate-500 mt-1">En mora</p>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-4 text-center">
+                <p className="text-3xl font-bold text-amber-600">{danados}</p>
+                <p className="text-xs text-slate-500 mt-1">Activos dañados</p>
+              </div>
+            </div>
+            <div className="space-y-2 pt-2">
+              <ProgressBar value={devueltos} total={stats.devueltos + stats.prestamos_activos + enMora || 1} color="#10b981" label="Tasa de devolución" />
+              <ProgressBar value={enMora} total={stats.prestamos_activos || 1} color="#ef4444" label="Tasa de morosidad" />
+              <ProgressBar value={danados} total={total} color="#F7C800" label="Tasa de daños" />
+            </div>
+          </div>
+
+          {/* Untracked Stock & Blockchain */}
+          <div className="space-y-4">
+            <div className="card-glass space-y-3">
+              <h2 className="font-bold text-[#09488D]">📡 Stock Controlado vs Sin Control</h2>
+              <p className="text-xs text-slate-400">Comparativa de activos prestados: los trazables usan QR para trazabilidad completa. Los consumibles se prestan por stock y no pueden rastrearse individualmente.</p>
+              <BarChart
+                trazables={stats.total_trazables || 0}
+                consumibles={stats.total_consumibles || 0}
+                tPrestados={stats.trazables_prestados || 0}
+                cPrestados={stats.consumibles_prestados || 0}
+              />
+              <div className="flex gap-2 text-xs">
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-[#09488D]" /> Trazables</span>
+                <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-400" /> Consumibles</span>
+              </div>
+              <p className="text-[11px] text-slate-400 pt-1">⚠️ Los consumibles prestados no se pueden rastrear individualmente. Se recomienda mantener un control manual del stock restante.</p>
+            </div>
+
+            <div className="card-glass space-y-3">
+              <h2 className="font-bold text-[#09488D]">⛓️ Blockchain Tracker</h2>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Red</span>
+                  <span className="font-mono text-[#09488D] font-medium">Polygon Amoy Testnet</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Contrato</span>
+                  <span className="font-mono text-xs text-slate-600">0x8f8ed9...c6</span>
+                </div>
+                <div className="flex justify-between py-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Wallet</span>
+                  <span className="font-mono text-xs text-slate-600">0x5d0A0f...aF</span>
+                </div>
+                <div className="flex justify-between py-1.5">
+                  <span className="text-slate-500">Estado</span>
+                  <span className="text-emerald-600 font-medium flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-400" /> Operativo</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── SECTION 3: Export ─── */}
+        <div className="card-glass flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-[#09488D]">📥 Exportar Datos</h2>
+            <p className="text-xs text-slate-400">Descargá reportes para decanatura en formato CSV.</p>
+          </div>
+          <button onClick={() => {
+            const headers = "Métrica,Valor\n";
+            const rows = `Total Activos,${total}\nDisponibles,${disponibles}\nPrestados,${prestados}\nDañados,${danados}\nPréstamos Activos,${stats.prestamos_activos}\nDevueltos,${devueltos}\nEn Mora,${enMora}`;
+            const blob = new Blob([headers + rows], { type: "text/csv" });
+            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "reporte_lab_iu.csv"; a.click();
+          }} className="btn-primary text-sm">📥 Exportar CSV</button>
+        </div>
+      </div>
     </div>
   );
 }

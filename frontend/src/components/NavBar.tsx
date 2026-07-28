@@ -76,7 +76,7 @@ export default function NavBar() {
             <>
               <Link href="/inventario/registrar" className={linkClass("/inventario/registrar")}>Nuevo Activo</Link>
               <Link href="/prestamos/aprobar" className={linkClass("/prestamos/aprobar")}>Aprobar</Link>
-              <Link href="/prestamos/devolver" className={linkClass("/prestamos/devolver")}>Devolver</Link>
+              <Link href="/prestamos/devolver" className={linkClass("/prestamos/devolver")}>Devoluciones</Link>
               <Link href="/prestamos" className={linkClass("/prestamos")}>Préstamos</Link>
             </>
           )}
@@ -84,6 +84,7 @@ export default function NavBar() {
             <>
               <Link href="/reportes" className={linkClass("/reportes")}>Reportes</Link>
               <Link href="/monitores" className={linkClass("/monitores")}>Monitores</Link>
+              <Link href="/estudiantes" className={linkClass("/estudiantes")}>Estudiantes</Link>
               <Link href="/configuracion" className={linkClass("/configuracion")}>Config</Link>
             </>
           )}
