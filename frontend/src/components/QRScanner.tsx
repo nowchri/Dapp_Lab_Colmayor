@@ -6,9 +6,10 @@ interface Props {
   onScan: (code: string) => void;
   bagCount: number;
   onClose: () => void;
+  showBagLink?: boolean;
 }
 
-export default function QRScanner({ onScan, bagCount, onClose }: Props) {
+export default function QRScanner({ onScan, bagCount, onClose, showBagLink = true }: Props) {
   const [error, setError] = useState("");
   const [lastScan, setLastScan] = useState("");
 
@@ -33,7 +34,7 @@ export default function QRScanner({ onScan, bagCount, onClose }: Props) {
           () => {}
         )
         .catch((err: any) => {
-          setError("No se pudo acceder a la camara: " + (err?.message || err));
+          setError("No se pudo acceder a la cámara: " + (err?.message || err));
         });
     });
 
@@ -52,7 +53,7 @@ export default function QRScanner({ onScan, bagCount, onClose }: Props) {
           <div>
             <h2 className="font-bold text-[#09488D] text-lg">Escanear QR</h2>
             <p className="text-xs text-slate-400">
-              {lastScan ? `Ultimo: ${lastScan}` : "Apuntá al código QR del activo"}
+              {lastScan ? `Último: ${lastScan}` : "Apuntá al código QR del activo"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -75,13 +76,17 @@ export default function QRScanner({ onScan, bagCount, onClose }: Props) {
         </div>
 
         <div className="p-4 flex gap-2">
-          <button onClick={onClose} className="btn-ghost flex-1 text-sm">Cerrar</button>
-          <button
-            onClick={() => window.location.href = "/prestamos/nuevo"}
-            className="btn-primary flex-1 text-sm"
-          >
-            Ir a la bolsa ({bagCount})
+          <button onClick={onClose} className={showBagLink ? "btn-ghost flex-1 text-sm" : "btn-primary w-full text-sm"}>
+            {showBagLink ? "Cerrar" : "Cerrar escáner"}
           </button>
+          {showBagLink && (
+            <button
+              onClick={() => window.location.href = "/prestamos/nuevo"}
+              className="btn-primary flex-1 text-sm"
+            >
+              Ir a la bolsa ({bagCount})
+            </button>
+          )}
         </div>
       </div>
     </div>

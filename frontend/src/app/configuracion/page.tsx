@@ -43,12 +43,12 @@ export default function ConfiguracionPage() {
   if (loading) return <div className="p-8 text-center text-iu-gray">Cargando...</div>;
 
   return (
-    <div className="min-h-screen bg-iu-light p-6">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <div className="min-h-screen bg-iu-light p-4 md:p-6">
+      <div className="max-w-full md:max-w-2xl mx-auto space-y-8">
         <h1 className="text-2xl font-bold text-iu-primary">⚙️ Configuración del Sistema</h1>
 
         {/* Bloqueo por mora */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm space-y-4">
           <div className="flex items-start justify-between">
             <div>
               <h2 className="font-bold text-iu-dark text-lg">Bloqueo por mora (D1)</h2>
@@ -80,7 +80,7 @@ export default function ConfiguracionPage() {
         </div>
 
         {/* Información del sistema */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm space-y-3">
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm space-y-3">
           <h2 className="font-bold text-iu-dark text-lg">Información del contrato</h2>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">

@@ -6,12 +6,12 @@ import toast from "react-hot-toast";
 import QRCode from "qrcode";
 
 interface Categoria { id_categoria: string; nombre_categoria: string; }
-interface ChildItem { nombre: string; qr: string; }
+interface ChildItem { nombre: string; qr?: string; }
 
 export default function RegistrarActivoPage() {
   const router = useRouter();
   const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [activosPadre, setActivosPadre] = useState<any[]>([]);
+  
   const [loading, setLoading] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrText, setQrText] = useState("");
@@ -20,12 +20,16 @@ export default function RegistrarActivoPage() {
 
   const [form, setForm] = useState({
     nombre_activo: "", tipo: "trazable" as string, codigo_qr: "",
-    id_categoria: "", id_activo_padre: "", observaciones_iniciales: "",
+    id_categoria: "", id_activo_padre: "", observaciones_iniciales: "", stock_actual: 0,
   });
+
+  const [areas, setAreas] = useState<any[]>([]);
+  const [selectedAreaId, setSelectedAreaId] = useState("");
 
   useEffect(() => {
     fetch("/api/categorias").then(r => r.json()).then(setCategorias).catch(() => {});
-    fetch("/api/inventario").then(r => r.json()).then((data: any[]) => setActivosPadre(data.filter(a => a.tipo === "trazable"))).catch(() => {});
+    fetch("/api/areas").then(r => r.json()).then(setAreas).catch(() => {});
+    
   }, []);
 
   // Detect if selected category is "kits" (case-insensitive)
@@ -51,7 +55,7 @@ export default function RegistrarActivoPage() {
     a.href = qrDataUrl; a.download = qrText.replace(/[^a-zA-Z0-9]/g, "_") + ".png"; a.click();
   }
 
-  function addChild() { setChildren([...children, { nombre: "", qr: "" }]); }
+  function addChild() { setChildren([...children, { nombre: "" }]); }
   function removeChild(i: number) { setChildren(children.filter((_, idx) => idx !== i)); }
   function updateChild(i: number, field: keyof ChildItem, value: string) {
     const updated = [...children];
@@ -76,7 +80,7 @@ export default function RegistrarActivoPage() {
         body: JSON.stringify({
           nombre_activo: form.nombre_activo.trim(), codigo_qr: qr,
           id_categoria: form.id_categoria || null, id_activo_padre: form.id_activo_padre || null,
-          tipo: form.tipo, observaciones_iniciales: form.observaciones_iniciales || null,
+          tipo: form.tipo, observaciones_iniciales: form.observaciones_iniciales || null, stock_actual: form.tipo === "consumible" ? form.stock_actual : 0,
         }),
       });
       if (!parentRes.ok) {
@@ -90,11 +94,10 @@ export default function RegistrarActivoPage() {
       let childCount = 0;
       for (const child of children) {
         if (!child.nombre.trim()) continue;
-        const childQr = child.qr || ("QR-" + child.nombre.trim().toUpperCase().replace(/\s+/g, "-").slice(0, 25) + "-" + Date.now().toString(36).toUpperCase());
         await fetch("/api/inventario", {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            nombre_activo: child.nombre.trim(), codigo_qr: childQr,
+            nombre_activo: child.nombre.trim(), codigo_qr: null,
             id_categoria: null, id_activo_padre: parentId,
             tipo: "trazable", observaciones_iniciales: null,
           }),
@@ -109,11 +112,11 @@ export default function RegistrarActivoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F6F9] p-6">
+    <div className="min-h-screen bg-[#F4F6F9] p-4 md:p-6">
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl font-bold text-[#09488D] mb-6">Registrar Nuevo Activo</h1>
+        <h1 className="text-xl md:text-2xl font-bold text-[#09488D] mb-6">Registrar Nuevo Activo</h1>
 
-        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 shadow-sm space-y-6">
+        <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm space-y-6">
           {/* Nombre */}
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">Nombre del activo *</label>
@@ -123,7 +126,7 @@ export default function RegistrarActivoPage() {
           </div>
 
           {/* Tipo + Categoria */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Tipo *</label>
               <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })}
@@ -133,31 +136,54 @@ export default function RegistrarActivoPage() {
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Area</label>
+              <select
+                value={selectedAreaId}
+                onChange={e => {
+                  setSelectedAreaId(e.target.value);
+                  setForm({ ...form, id_categoria: "" });
+                }}
+                className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none">
+                <option value="">Seleccioná un area</option>
+                {areas.map((a: any) => (
+                  <option key={a.id_area} value={a.id_area}>{a.nombre_area}</option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Categoria</label>
               <select value={form.id_categoria} onChange={e => setForm({ ...form, id_categoria: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none">
                 <option value="">Sin categoria</option>
-                {categorias.map((c: Categoria) => (
-                  <option key={c.id_categoria} value={c.id_categoria}>{c.nombre_categoria}</option>
+                {categorias
+                .filter((c: any) => !selectedAreaId || c.id_area === selectedAreaId)
+                .map((c: any) => (
+                  <option key={c.id_categoria} value={c.id_categoria}>
+                    {c.nombre_categoria}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* Kit padre (only if not a kit itself) */}
-          {!esKit && (
+
+
+          {/* Stock input — solo consumibles */}
+          {form.tipo === "consumible" && (
             <div>
-              <label className="block text-sm font-medium text-slate-600 mb-1">Kit padre (opcional)</label>
-              <select value={form.id_activo_padre} onChange={e => setForm({ ...form, id_activo_padre: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none">
-                <option value="">Activo independiente</option>
-                {activosPadre.map((a: any) => <option key={a.id_activo} value={a.id_activo}>{a.nombre_activo}</option>)}
-              </select>
+              <label className="block text-sm font-medium text-slate-600 mb-1">Stock disponible *</label>
+              <input
+                type="number" min="0"
+                value={form.stock_actual || ""}
+                onChange={e => setForm({ ...form, stock_actual: Number(e.target.value) })}
+                className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#09488D]"
+                placeholder="Ej: 50"
+              />
             </div>
           )}
 
-          {/* QR Section */}
-          {!esKit && (
+          {/* QR Section — solo trazables */}
+          {form.tipo !== "consumible" && (
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-1">Codigo QR {form.tipo === "consumible" && "(no aplica)"}</label>
               <div className="flex gap-3 mb-3">
@@ -168,9 +194,9 @@ export default function RegistrarActivoPage() {
                   className="btn-primary text-sm whitespace-nowrap px-4">Generar QR</button>
               </div>
               {qrDataUrl && (
-                <div className="flex items-start gap-4 p-4 bg-[#F4F6F9] rounded-xl border border-gray-200">
+                <div className="flex flex-col sm:flex-row items-start gap-3 p-4 bg-[#F4F6F9] rounded-xl border border-gray-200">
                   <div className="bg-white p-2 rounded-lg border-2 border-[#09488D]/20 shadow-sm shrink-0">
-                    <img src={qrDataUrl} alt="QR" className="w-36 h-36 object-contain" />
+                    <img src={qrDataUrl} alt="QR" className="w-28 h-28 sm:w-36 sm:h-36 object-contain" />
                   </div>
                   <div className="flex flex-col gap-2 min-w-0 flex-1">
                     <p className="font-mono text-xs text-slate-500 break-all bg-white rounded-lg p-2 border">{qrText}</p>
@@ -195,7 +221,7 @@ export default function RegistrarActivoPage() {
                   + Agregar componente
                 </button>
               </div>
-              <p className="text-xs text-amber-600">Agregá cada pieza que compone este kit. Se generará un QR individual para cada una.</p>
+              <p className="text-xs text-amber-600">Agregá cada pieza que compone este kit. Se añadirán a la lista de componentes de este kit.</p>
               <p className="text-xs text-rose-500 font-medium mt-1">⚠️ Importante: Una vez registrado, no se podrán añadir ni eliminar componentes del kit. Verificá bien antes de guardar.</p>
               {children.length === 0 && (
                 <p className="text-xs text-slate-400 text-center py-4 border border-dashed border-amber-300 rounded-lg">
@@ -204,13 +230,11 @@ export default function RegistrarActivoPage() {
               )}
               {children.map((child, i) => (
                 <div key={i} className="flex gap-2 items-start bg-white rounded-lg p-3 border border-amber-100">
-                  <div className="flex-1 space-y-2">
+                  <div className="flex-1">
                     <input type="text" value={child.nombre} onChange={e => updateChild(i, "nombre", e.target.value)}
                       placeholder="Nombre del componente (ej: Cable USB)"
                       className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-1 focus:ring-[#09488D]" />
-                    <input type="text" value={child.qr} onChange={e => updateChild(i, "qr", e.target.value)}
-                      placeholder="Código QR (opcional, se auto-genera)"
-                      className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-mono outline-none" />
+                    <p className="text-[10px] text-slate-400 mt-1">Sin QR — solo visible dentro de este kit</p>
                   </div>
                   <button type="button" onClick={() => removeChild(i)}
                     className="text-rose-400 hover:text-rose-600 text-sm mt-1 shrink-0">✕</button>
@@ -228,7 +252,7 @@ export default function RegistrarActivoPage() {
           </div>
 
           {/* Botones */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row gap-2 pt-2">
             <button type="submit" disabled={loading} className="btn-primary flex-1">
               {loading ? "Guardando..." : esKit && children.length > 0 ? `Registrar Kit (+${children.length})` : "Registrar Activo"}
             </button>

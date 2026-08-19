@@ -79,7 +79,7 @@ export default function MonitoresPage() {
   if (loading) return <div className="p-8 text-center text-iu-gray">Cargando...</div>;
 
   return (
-    <div className="min-h-screen bg-iu-light p-6">
+    <div className="min-h-screen bg-iu-light p-4 md:p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-iu-primary">Gestion de Monitores</h1>
@@ -93,7 +93,7 @@ export default function MonitoresPage() {
 
         {/* Formulario nuevo monitor */}
         {showForm && (
-          <form onSubmit={crearMonitor} className="bg-white rounded-2xl p-6 shadow-sm space-y-4">
+          <form onSubmit={crearMonitor} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm space-y-4">
             <h2 className="font-bold text-iu-dark">Registrar nuevo monitor</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -154,7 +154,7 @@ export default function MonitoresPage() {
         )}
 
         {/* Lista de monitores */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 md:p-6 shadow-sm">
           <h2 className="font-bold text-iu-dark mb-4">Monitores registrados ({monitores.length})</h2>
           {monitores.length === 0 ? (
             <p className="text-sm text-iu-gray text-center py-6">No hay monitores registrados.</p>

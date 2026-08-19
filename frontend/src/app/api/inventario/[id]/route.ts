@@ -10,7 +10,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ error: "Solo monitores/admin pueden cambiar estados" }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));
-  const { estado, id_categoria } = body;
+  const { estado, id_categoria, stock_actual } = body;
   const pool = getPool();
 
   if (estado) {
@@ -22,6 +22,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
   if (id_categoria !== undefined) {
     await pool.query("UPDATE activos SET id_categoria = $1 WHERE id_activo = $2", [id_categoria || null, params.id]);
+  }
+
+  if (stock_actual !== undefined) {
+    if (typeof stock_actual !== "number" || stock_actual < 0) {
+      return NextResponse.json({ error: "Stock invalido" }, { status: 400 });
+    }
+    await pool.query("UPDATE activos SET stock_actual = $1 WHERE id_activo = $2", [stock_actual, params.id]);
   }
 
   return NextResponse.json({ ok: true });

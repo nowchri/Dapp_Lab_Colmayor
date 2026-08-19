@@ -105,18 +105,18 @@ export const DEFAULT_ICON_BY_CATEGORY: Record<string, string> = {
 
 // --- Conexión PostgreSQL (BD local) ---
 export const DATABASE_URL = process.env.DATABASE_URL ||
-  "postgresql://postgres:1234@localhost:5432/Bd_laboratorio";
+  "postgresql://postgres:1234@localhost:5432/Db_lab";
 
 // --- Polygon Amoy (E2 RESUELTO) ---
 export const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL ||
-  "https://polygon-amoy.g.alchemy.com/v2/alch_Iz_Z3n06ZnpaR0nj-vDFW";
+  "https://polygon-amoy.g.alchemy.com/v2/alch_HIDxbnmNIbiWLrGt3gdsN";
 
 // --- Smart Contract ---
 export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 
 // --- Email (E5 RESUELTO) ---
 export const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ||
-  "apinotprovided"; 
+  "";
 export const EMAIL_FROM = process.env.EMAIL_FROM || "cristian_santiago@unimayor.edu.co";
-export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "testpruea2@unimayor.edu.co";
-export const DECANATURA_EMAIL = process.env.DECANATURA_EMAIL || "testpruea2@unimayor.edu.co";
+export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "cristiansantiago808@gmail.com";
+export const DECANATURA_EMAIL = process.env.DECANATURA_EMAIL || "testpruea@gmail.com";

@@ -49,7 +49,7 @@ export default function LoginPage() {
         </div>
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <h2 className="text-xl font-bold text-iu-primary mb-1">Iniciar Sesi&oacute;n</h2>
-          <p className="text-iu-gray text-sm mb-6">Ingresa con tu correo institucional @unimayor.edu.co</p>
+          <p className="text-iu-gray text-sm mb-6">Ingresa con tu correo institucional UNIMAYOR</p>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>

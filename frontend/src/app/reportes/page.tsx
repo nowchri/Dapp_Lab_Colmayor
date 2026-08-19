@@ -114,7 +114,7 @@ export default function ReportesPage() {
         {/* ─── SECTION 1: Asset Status Donuts ─── */}
         <div className="card-glass">
           <h2 className="font-bold text-[#09488D] mb-4">📦 Estado de los Activos</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <DonutRing value={disponibles} total={total} color="#10b981" label="Disponibles" sublabel="activos listos" />
             <DonutRing value={prestados} total={total} color="#09488D" label="Prestados" sublabel="en circulación" />
             <DonutRing value={danados} total={total} color="#ef4444" label="Dañados" sublabel="requieren atención" />
@@ -123,11 +123,11 @@ export default function ReportesPage() {
         </div>
 
         {/* ─── SECTION 2: Loan Analytics ─── */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           {/* KPI Blocks */}
           <div className="card-glass space-y-4">
             <h2 className="font-bold text-[#09488D]">📋 Métricas de Préstamos</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="bg-[#09488D]/5 rounded-xl p-4 text-center">
                 <p className="text-3xl font-bold text-[#09488D]">{stats.prestamos_activos}</p>
                 <p className="text-xs text-slate-500 mt-1">Préstamos activos</p>
@@ -195,17 +195,60 @@ export default function ReportesPage() {
         </div>
 
         {/* ─── SECTION 3: Export ─── */}
-        <div className="card-glass flex items-center justify-between">
-          <div>
-            <h2 className="font-bold text-[#09488D]">📥 Exportar Datos</h2>
-            <p className="text-xs text-slate-400">Descargá reportes para decanatura en formato CSV.</p>
+        {/* ─── Download buttons ─── */}
+        <div className="card-glass">
+          <h2 className="font-bold text-[#09488D] mb-4">📥 Descargar Reportes</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 gap-3">
+            <a
+              href="/api/reports/excel"
+              className="flex items-center gap-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition group"
+            >
+              <span className="text-2xl">📊</span>
+              <div>
+                <p className="font-semibold text-emerald-700 text-sm">Inventario Excel</p>
+                <p className="text-xs text-emerald-500">Todos los activos en formato CSV</p>
+              </div>
+            </a>
+
+            <a
+              href="/api/reports/danados"
+              target="_blank"
+              rel="noopener"
+              className="flex items-center gap-3 p-4 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 transition group"
+            >
+              <span className="text-2xl">🔴</span>
+              <div>
+                <p className="font-semibold text-rose-700 text-sm">Activos Dañados PDF</p>
+                <p className="text-xs text-rose-500">Listado para imprimir (Ctrl+P)</p>
+              </div>
+            </a>
+
+            <a
+              href="/api/reports/morosos"
+              target="_blank"
+              rel="noopener"
+              className="flex items-center gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 transition group"
+            >
+              <span className="text-2xl">🚨</span>
+              <div>
+                <p className="font-semibold text-amber-700 text-sm">Estudiantes en Mora PDF</p>
+                <p className="text-xs text-amber-500">Listado para imprimir (Ctrl+P)</p>
+              </div>
+            </a>
           </div>
-          <button onClick={() => {
-            const headers = "Métrica,Valor\n";
-            const rows = `Total Activos,${total}\nDisponibles,${disponibles}\nPrestados,${prestados}\nDañados,${danados}\nPréstamos Activos,${stats.prestamos_activos}\nDevueltos,${devueltos}\nEn Mora,${enMora}`;
-            const blob = new Blob([headers + rows], { type: "text/csv" });
-            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "reporte_lab_iu.csv"; a.click();
-          }} className="btn-primary text-sm">📥 Exportar CSV</button>
+
+          <a
+            href="/api/reports/qr-sheet"
+            target="_blank"
+            rel="noopener"
+            className="flex items-center gap-3 p-4 rounded-xl border border-[#09488D]/30 bg-[#09488D]/5 hover:bg-[#09488D]/10 transition group"
+          >
+            <span className="text-2xl">🏷️</span>
+            <div>
+              <p className="font-semibold text-[#09488D] text-sm">Stickers QR (Todo el inventario)</p>
+              <p className="text-xs text-[#09488D]/70">Hoja imprimible para pegar en cada activo</p>
+            </div>
+          </a>
         </div>
       </div>
     </div>

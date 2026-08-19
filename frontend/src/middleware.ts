@@ -15,6 +15,7 @@ const PUBLIC = ["/login", "/register", "/api/auth/login", "/api/auth/register", 
 
 // Rutas exclusivas de admin
 const ADMIN_ONLY = ["/reportes", "/monitores", "/configuracion", "/estudiantes"];
+const MONITOR_ONLY = ["/prestamos/docente"];
 
 // Rutas de monitor (crear activos, aprobar, devolver)
 const MONITOR_PATHS = ["/inventario/registrar", "/prestamos/aprobar", "/prestamos/devolver"];

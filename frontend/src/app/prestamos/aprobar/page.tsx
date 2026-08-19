@@ -77,7 +77,7 @@ export default function AprobarPage() {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-3 mb-1">
             <span className="text-3xl">✅</span>
-            <h1 className="text-2xl font-bold text-[#09488D]">Aprobar Préstamos</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-[#09488D]">Aprobar Préstamos</h1>
             <span className="pill-accent">{pendientes.length} pendientes</span>
           </div>
           <p className="text-sm text-slate-400 mt-1">Estas son las solicitudes de estudiantes que necesitan material del laboratorio. Revisá cada una y aprobá o rechazá según corresponda.</p>

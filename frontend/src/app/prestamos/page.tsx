@@ -7,7 +7,7 @@ import FabScanner from "@/components/FabScanner";
 interface Prestamo {
   id_prestamo: string; estudiante_nombre: string; monitor_nombre: string | null;
   estado_general: string; fecha_inicio: string; fecha_limite: string; materia: string | null; profesor_encargado: string | null;
-  motivo_rechazo: string | null;
+  motivo_rechazo: string | null; id_monitor_validador: string | null; nombre_docente: string | null;
 }
 
 interface DetallesPopupProps {
@@ -38,7 +38,7 @@ function DetallesPopup({ prestamo, onClose }: DetallesPopupProps) {
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl">&times;</button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
           <div><p className="text-xs text-slate-400">Estudiante</p><p className="font-medium">{prestamo.estudiante_nombre}</p></div>
           <div><p className="text-xs text-slate-400">Monitor</p><p className="font-medium">{prestamo.monitor_nombre || "—"}</p></div>
           <div><p className="text-xs text-slate-400">Materia</p><p className="font-medium">{prestamo.materia || "—"}</p></div>
@@ -80,8 +80,10 @@ const STATUS: Record<string, { label: string; icon: string; pill: string }> = {
   pendiente: { label: "Pendiente", icon: "⏳", pill: "pill-accent" },
   activo: { label: "Activo", icon: "📦", pill: "pill-primary" },
   devuelto: { label: "Devuelto", icon: "✅", pill: "pill-success" },
+  pendiente: { label: "Pendiente", icon: "⏳", pill: "pill-accent" },
   mora: { label: "En Mora", icon: "🚨", pill: "pill-danger" },
-  cancelado: { label: "Cancelado", icon: "✕", pill: "pill-danger" },
+  mora: { label: "En Mora", icon: "🚨", pill: "pill-danger" },
+  rechazado: { label: "Rechazado", icon: "✕", pill: "pill-danger" },
 };
 
 export default function PrestamosPage() {
@@ -101,9 +103,9 @@ export default function PrestamosPage() {
 
   return (
     <div className="min-h-screen bg-[#F4F6F9] pb-12">
-      <div className="bg-white border-b border-gray-100 px-6 py-6">
+      <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-4 md:py-6">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-[#09488D]">Préstamos</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-[#09488D]">Préstamos</h1>
           <span className="pill-primary">{prestamos.length}</span>
         </div>
       </div>
@@ -140,7 +142,7 @@ export default function PrestamosPage() {
                     <span>{inicio.toLocaleDateString("es-CO")}</span>
                     <span>{limite.toLocaleDateString("es-CO")}</span>
                   </div>
-                  {p.estado_general === "activo" && (() => {
+                  {(p.estado_general === "activo" || p.estado_general === "mora") && (() => {
                     const ahora = new Date();
                     const diff = Math.ceil((limite.getTime() - ahora.getTime()) / 86400000);
                     if (diff > 5) return <p className="text-[11px] font-medium text-emerald-600 mt-1">🟢 Quedan {diff} días</p>;

@@ -20,7 +20,7 @@ export default function DevolverPage() {
   const [detalles, setDetalles] = useState<Detalle[]>([]);
   const [devueltos, setDevueltos] = useState<Set<string>>(new Set());
   const [estados, setEstados] = useState<Record<string, string>>({});
-  const [observacion, setObservacion] = useState("");
+  const [observacionesPerItem, setObservacionesPerItem] = useState<Record<string, string>>({});
   const [busqueda, setBusqueda] = useState("");
 
   useEffect(() => {
@@ -43,26 +43,34 @@ export default function DevolverPage() {
       setDetalles(data);
       setDevueltos(new Set());
       setEstados({});
-      setObservacion("");
+      setObservacionesPerItem({});
     }
   }
 
   function toggle(d: Detalle) {
     const n = new Set(devueltos);
-    n.has(d.id_detalle) ? n.delete(d.id_detalle) : n.add(d.id_detalle);
+    if (n.has(d.id_detalle)) {
+      n.delete(d.id_detalle);
+      const newObs = { ...observacionesPerItem };
+      delete newObs[d.id_detalle];
+      setObservacionesPerItem(newObs);
+    } else {
+      n.add(d.id_detalle);
+    }
     setDevueltos(n);
+  }
+
+  function setObsPerItem(id: string, value: string) {
+    setObservacionesPerItem(prev => ({ ...prev, [id]: value }));
   }
 
   async function confirmar() {
     if (!seleccionado) return;
     const items = detalles.map(d => ({
       id_detalle: d.id_detalle,
-      observacion: devueltos.has(d.id_detalle) ? observacion : undefined,
+      observacion: devueltos.has(d.id_detalle) ? (observacionesPerItem[d.id_detalle] || null) : null,
       estado_final: estados[d.id_detalle] || "disponible",
     }));
-    if (!items.some((_: any, i: number) => devueltos.has(detalles[i].id_detalle))) {
-      return toast.error("Seleccioná al menos un artículo");
-    }
     try {
       const res = await fetch(`/api/prestamos/${seleccionado}/devolver`, {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -82,8 +90,7 @@ export default function DevolverPage() {
   function diasRestantes(fechaLimite: string) {
     const ahora = new Date();
     const limite = new Date(fechaLimite);
-    const diff = Math.ceil((limite.getTime() - ahora.getTime()) / 86400000);
-    return diff;
+    return Math.ceil((limite.getTime() - ahora.getTime()) / 86400000);
   }
 
   function urgencia(diff: number) {
@@ -94,14 +101,14 @@ export default function DevolverPage() {
 
   return (
     <div className="min-h-screen bg-[#F4F6F9] pb-12">
-      <div className="bg-white border-b border-gray-100 px-6 py-8">
+      <div className="bg-white border-b border-gray-100 px-4 md:px-6 py-6 md:py-8">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-3 mb-1">
             <span className="text-3xl">🔄</span>
-            <h1 className="text-2xl font-bold text-[#09488D]">Devoluciones</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-[#09488D]">Devoluciones</h1>
             <span className="pill-primary">{prestamos.length} activos</span>
           </div>
-          <p className="text-sm text-slate-400 mt-1">Registrá la devolución de material prestado. Seleccioná un préstamo, marcá los artículos devueltos y confirmá.</p>
+          <p className="text-sm text-slate-400 mt-1">Registrá la devolución de material prestado.</p>
           <input
             type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
             placeholder="Buscar por nombre o código de estudiante..."
@@ -110,7 +117,7 @@ export default function DevolverPage() {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto mt-6 px-6">
+      <div className="max-w-4xl mx-auto mt-6 px-4 md:px-6">
         {!seleccionado ? (
           <div className="space-y-3">
             {filtrados.length === 0 ? (
@@ -129,15 +136,13 @@ export default function DevolverPage() {
                         <p className="font-semibold text-[#09488D]">{p.estudiante_nombre}</p>
                         <p className="text-xs text-slate-400">{p.materia || "Sin materia"} · #{p.id_prestamo.slice(0,8)}</p>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${urg.text} bg-${urg.color.replace("bg-","")}/10`}>
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${urg.text}`}>
                         {urg.label} ({diff}d)
                       </span>
                     </div>
-                    {/* Timeline bar */}
                     <div className="flex items-center gap-1">
                       <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${urg.color}`}
+                        <div className={`h-full rounded-full transition-all ${urg.color}`}
                           style={{ width: `${Math.max(0, Math.min(100, ((30 - diff) / 30) * 100))}%` }}
                         />
                       </div>
@@ -158,19 +163,15 @@ export default function DevolverPage() {
               <h2 className="font-bold text-[#09488D] text-lg">Confirmar devolución</h2>
               <button onClick={() => setSeleccionado(null)} className="btn-ghost text-sm">← Volver</button>
             </div>
+
             <div className="space-y-2 max-h-80 overflow-y-auto">
               {detalles.map(d => {
                 const marcado = devueltos.has(d.id_detalle);
                 return (
-                  <div
-                    key={d.id_detalle}
-                    onClick={() => toggle(d)}
-                    className={`flex items-center justify-between rounded-xl p-4 cursor-pointer transition-all border ${
-                      marcado
-                        ? "bg-emerald-50/60 border-emerald-200 shadow-sm"
-                        : "bg-[#F4F6F9] border-transparent hover:border-slate-200"
-                    }`}
-                  >
+                  <div key={d.id_detalle} onClick={() => toggle(d)}
+                    className={`flex flex-col rounded-xl p-4 cursor-pointer transition-all border ${
+                      marcado ? "bg-emerald-50/60 border-emerald-200 shadow-sm" : "bg-[#F4F6F9] border-transparent hover:border-slate-200"
+                    }`}>
                     <div className="flex items-start gap-3 flex-1 min-w-0">
                       <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
                         marcado ? "bg-emerald-500 border-emerald-500" : "border-slate-300"
@@ -181,31 +182,48 @@ export default function DevolverPage() {
                         <p className={`font-medium text-sm ${marcado ? "text-emerald-700" : "text-slate-700"}`}>
                           {d.activo_nombre}
                         </p>
-                        <p className="text-xs text-slate-400">{d.activo_tipo === "trazable" ? "🔍 Trazable (QR individual)" : "📦 Consumible (por stock)"} · Cantidad: {d.cantidad_entregada} {d.cantidad_entregada === 1 ? "unidad" : "unidades"}</p>
+                        <p className="text-xs text-slate-400">
+                          {d.activo_tipo === "trazable" ? "🔍 Trazable" : "📦 Consumible"} · Cantidad: {d.cantidad_entregada}
+                        </p>
                       </div>
                     </div>
+
                     {marcado && (
-                      <select
-                        value={estados[d.id_detalle] || "disponible"}
-                        onClick={e => e.stopPropagation()}
-                        onChange={e => setEstados({ ...estados, [d.id_detalle]: e.target.value })}
-                        className="text-xs border border-emerald-200 rounded-lg px-2 py-1.5 bg-white text-emerald-700 font-medium shrink-0 ml-2 cursor-pointer"
-                      >
-                        {ESTADOS_ACTIVO.map(e => <option key={e} value={e}>{e === "disponible" ? "✅ " + e : e === "dañado" ? "⚠️ " + e : "🔧 " + e}</option>)}
-                      </select>
+                      <div className="mt-3 ml-8 space-y-2" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="text"
+                          value={observacionesPerItem[d.id_detalle] || ""}
+                          onChange={e => setObsPerItem(d.id_detalle, e.target.value)}
+                          placeholder="Observación (opcional)..."
+                          className="w-full text-xs border border-emerald-200 rounded-lg px-2 py-1.5 bg-white outline-none"
+                        />
+                        <select
+                          value={estados[d.id_detalle] || "disponible"}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => setEstados({ ...estados, [d.id_detalle]: e.target.value })}
+                          className="text-xs border border-emerald-200 rounded-lg px-2 py-1.5 bg-white text-emerald-700 font-medium cursor-pointer"
+                        >
+                          {ESTADOS_ACTIVO.map(e => <option key={e} value={e}>
+                            {e === "disponible" ? "✅ " + e : e === "dañado" ? "⚠️ " + e : "🔧 " + e}
+                          </option>)}
+                        </select>
+                      </div>
                     )}
                   </div>
                 );
               })}
             </div>
-            <textarea
-              value={observacion}
-              onChange={e => setObservacion(e.target.value)}
-              className="input-glass h-20 resize-none"
-              placeholder="Observaciones (opcional)..."
-            />
-            <button onClick={confirmar} disabled={devueltos.size === 0} className="btn-primary w-full text-sm">
-              Confirmar Devolución ({devueltos.size} artículos)
+
+            <button
+              onClick={confirmar}
+              disabled={devueltos.size === 0 || devueltos.size < detalles.length}
+              className="btn-primary w-full text-sm"
+            >
+              {devueltos.size === 0
+                ? "Seleccioná todos los artículos"
+                : devueltos.size < detalles.length
+                  ? `Faltan ${detalles.length - devueltos.size} artículos`
+                  : `Confirmar Devolución (${devueltos.size})`}
             </button>
           </div>
         )}

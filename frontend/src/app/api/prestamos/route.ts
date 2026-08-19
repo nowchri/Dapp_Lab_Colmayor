@@ -2,134 +2,127 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { cookies } from "next/headers";
 
-// GET — Listar prestamos (filtrado por rol)
-export async function GET() {
-  const cookieStore = cookies();
-  const sessionId = cookieStore.get("userId")?.value; // userId = id_perfil real, NOT session cookie
-  const rol = cookieStore.get("userRol")?.value;
-
-  if (!sessionId) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
+export async function POST(request: NextRequest) {
   try {
-    const pool = getPool();
-    let result;
+    const ck = cookies();
+    const userId = ck.get("userId")?.value;
+    const rol = ck.get("userRol")?.value;
 
+    if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+    const body = await request.json();
+    const { items, dias_prestamo, nombre_docente, materia, profesor_encargado, curso_grupo } = body;
+
+    if (!items || items.length === 0) return NextResponse.json({ error: "La bolsa está vacía" }, { status: 400 });
+
+    const pool = getPool();
+    let idEstudiante = userId;
+    const isDocente = !!nombre_docente;
+
+    if (isDocente) {
+      if (rol !== "monitor" && rol !== "admin") {
+        return NextResponse.json({ error: "Solo monitores pueden registrar préstamos a docentes" }, { status: 403 });
+      }
+      if (!nombre_docente.trim()) return NextResponse.json({ error: "Nombre del docente obligatorio" }, { status: 400 });
+    } else {
+      if (rol === "monitor" || rol === "admin") {
+        return NextResponse.json({ error: "Monitores deben usar 'Préstamo a Docente'" }, { status: 400 });
+      }
+    }
+
+    const fechaLimite = `NOW() + INTERVAL '${dias_prestamo || 8} days'`;
+
+    const result = await pool.query(
+      `INSERT INTO prestamos (id_estudiante, fecha_limite, materia, profesor_encargado, curso_grupo, estado_general, nombre_docente)
+       VALUES ($1, ${fechaLimite}, $2, $3, $4, 'pendiente', $5) RETURNING id_prestamo`,
+      [idEstudiante, materia || null, profesor_encargado || null, curso_grupo || null, nombre_docente || null]
+    );
+
+    const idPrestamo = result.rows[0].id_prestamo;
+
+    for (const item of items) {
+      await pool.query(
+        "INSERT INTO detalles_prestamo (id_prestamo, id_activo, cantidad_entregada) VALUES ($1, $2, $3)",
+        [idPrestamo, item.id_activo, item.cantidad || 1]
+      );
+    }
+
+    return NextResponse.json({ id_prestamo: idPrestamo, ok: true }, { status: 201 });
+  } catch (error: any) {
+    console.error("[prestamos/POST]", error.message);
+    return NextResponse.json({ error: "Error al crear préstamo" }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  try {
+    const ck = cookies();
+    const userId = ck.get("userId")?.value;
+    const rol = ck.get("userRol")?.value;
+    if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+
+    const pool = getPool();
+
+    // Auto-mark overdue loans as mora and send alerts (only once per new mora)
+    const moraResult = await pool.query(
+      `UPDATE prestamos SET estado_general = 'mora'
+       WHERE estado_general = 'activo' AND fecha_limite + INTERVAL '8 days' < NOW()
+       RETURNING id_prestamo, id_estudiante, fecha_limite, materia, profesor_encargado, curso_grupo`
+    );
+
+    if (moraResult.rows.length > 0) {
+      const { sendAlertaMora } = await import("@/lib/email");
+      for (const mp of moraResult.rows) {
+        const student = await pool.query(
+          "SELECT nombre_completo, cedula, correo_institucional, telefono, programa_academico FROM perfiles WHERE id_perfil = $1",
+          [mp.id_estudiante]
+        );
+        if (student.rows.length === 0) continue;
+        const s = student.rows[0];
+        const items = await pool.query(
+          `SELECT a.nombre_activo, dp.cantidad_entregada, a.tipo
+           FROM detalles_prestamo dp JOIN activos a ON dp.id_activo = a.id_activo
+           WHERE dp.id_prestamo = $1 AND dp.esta_devuelto = false`,
+          [mp.id_prestamo]
+        );
+        const dias = Math.ceil((Date.now() - new Date(mp.fecha_limite).getTime()) / 86400000);
+        sendAlertaMora({
+          estudiante_nombre: s.nombre_completo,
+          estudiante_cedula: s.cedula,
+          estudiante_correo: s.correo_institucional,
+          estudiante_telefono: s.telefono,
+          estudiante_programa: s.programa_academico,
+          monitor_nombre: "Sistema",
+          materia: mp.materia,
+          profesor_encargado: mp.profesor_encargado,
+          curso_grupo: mp.curso_grupo,
+          fecha_inicio: new Date().toISOString(),
+          fecha_limite: mp.fecha_limite,
+          dias_mora: Math.max(dias, 0),
+          items: items.rows.map((i: any) => ({ activo_nombre: i.nombre_activo, cantidad: i.cantidad_entregada, activo_tipo: i.tipo })),
+        }).catch(err => console.error("[Email] Error enviando mora:", err));
+      }
+    }
+
+    let result;
     if (rol === "estudiante") {
-      const uid = cookieStore.get("userId")?.value;
-      if (!uid) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
       result = await pool.query(
-        `SELECT p.*, pe.nombre_completo as estudiante_nombre, pm.nombre_completo as monitor_nombre
-         FROM prestamos p
-         JOIN perfiles pe ON p.id_estudiante = pe.id_perfil
-         LEFT JOIN perfiles pm ON p.id_monitor_validador = pm.id_perfil
-         WHERE p.id_estudiante = $1
-         ORDER BY p.fecha_inicio DESC`,
-        [uid]
+        `SELECT p.*, pe.nombre_completo as estudiante_nombre
+         FROM prestamos p JOIN perfiles pe ON p.id_estudiante = pe.id_perfil
+         WHERE p.id_estudiante = $1 ORDER BY p.fecha_inicio DESC`,
+        [userId]
       );
     } else {
       result = await pool.query(
-        `SELECT p.*, pe.nombre_completo as estudiante_nombre, pm.nombre_completo as monitor_nombre
-         FROM prestamos p
-         JOIN perfiles pe ON p.id_estudiante = pe.id_perfil
-         LEFT JOIN perfiles pm ON p.id_monitor_validador = pm.id_perfil
+        `SELECT p.*, pe.nombre_completo as estudiante_nombre
+         FROM prestamos p JOIN perfiles pe ON p.id_estudiante = pe.id_perfil
          ORDER BY p.fecha_inicio DESC`
       );
     }
 
     return NextResponse.json(result.rows);
   } catch (error: any) {
-    console.error("[prestamos/GET]", error.message, error.stack);
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-
-// POST: crea un préstamo nuevo (bolsa/carrito)
-export async function POST(request: NextRequest) {
-  const cookieStore = cookies();
-  const sessionId = cookieStore.get("userId")?.value; // userId = id_perfil real, NOT session cookie
-
-  if (!sessionId) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
-
-  let body;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "JSON invalido" }, { status: 400 });
-  }
-
-  const { items, fecha_limite, materia, profesor_encargado, curso_grupo } = body;
-
-  if (!items || items.length === 0) {
-    return NextResponse.json({ error: "La bolsa no puede estar vacia" }, { status: 400 });
-  }
-
-  if (!fecha_limite) {
-    return NextResponse.json({ error: "Fecha limite obligatoria" }, { status: 400 });
-  }
-
-  // Validar que cada item tenga id_activo
-  for (const item of items) {
-    if (!item.id_activo) {
-      return NextResponse.json({ error: "Cada item debe tener id_activo" }, { status: 400 });
-    }
-  }
-
-  try {
-    const pool = getPool();
-
-    // Validacion JIT de bloqueo por mora (D1 + D8)
-    // Si falla, continuamos sin bloquear
-    try {
-      const vencidos = await pool.query(
-        `SELECT COUNT(*) as cnt FROM prestamos
-         WHERE id_estudiante = $1
-           AND fecha_limite + INTERVAL '8 days' < NOW()
-           AND estado_general = 'activo'`,
-        [sessionId]
-      );
-      const toggle = process.env.BLOQUEO_POR_MORA !== "false";
-      const cnt = parseInt(vencidos.rows[0]?.cnt ?? "0", 10);
-      if (toggle && cnt > 0) {
-        return NextResponse.json({
-          error: "Bloqueado: tienes material pendiente con mas de 8 dias de retraso"
-        }, { status: 403 });
-      }
-    } catch (e) {
-      console.warn("[prestamos] JIT mora check non-blocking error:", e);
-    }
-
-    // Insertar cabecera de prestamo
-    const insertResult = await pool.query(
-      `INSERT INTO prestamos (id_estudiante, fecha_limite, materia, profesor_encargado, curso_grupo, estado_general)
-       VALUES ($1, $2, $3, $4, $5, 'pendiente')
-       RETURNING id_prestamo`,
-      [sessionId, fecha_limite, materia || null, profesor_encargado || null, curso_grupo || null]
-    );
-
-    const nuevaId = insertResult.rows[0]?.id_prestamo;
-
-    if (!nuevaId) {
-      throw new Error("INSERT no devolvio id_prestamo");
-    }
-
-    // Insertar cada detalle de la bolsa
-    for (const item of items) {
-      await pool.query(
-        `INSERT INTO detalles_prestamo (id_prestamo, id_activo, cantidad_entregada, observacion_entrega)
-         VALUES ($1, $2, $3, $4)`,
-        [nuevaId, item.id_activo, item.cantidad_entregada || 1, item.observacion_entrega || null]
-      );
-    }
-
-    return NextResponse.json({ id_prestamo: nuevaId }, { status: 201 });
-  } catch (error: any) {
-    console.error("[prestamos/POST]", error.message, error.stack);
-    return NextResponse.json({
-      error: error.message || "Error interno al crear prestamo"
-    }, { status: 500 });
+    console.error("[prestamos/GET]", error.message);
+    return NextResponse.json({ error: "Error al consultar" }, { status: 500 });
   }
 }

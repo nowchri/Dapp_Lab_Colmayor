@@ -22,7 +22,7 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setMsg("");
+    
 
     const limpio = form.email.trim().toLowerCase();
     if (!limpio) { setMsg("Ingresa tu correo institucional"); return; }
@@ -70,7 +70,7 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm font-medium text-iu-dark mb-1">Nombre completo *</label>
             <input type="text" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
-              placeholder="Ej: Cristhian Gallego" className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-iu-primary" />
+              placeholder="Ej: Juan Pérez" className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-iu-primary" />
           </div>
           <div>
             <label className="block text-sm font-medium text-iu-dark mb-1">Cedula *</label>

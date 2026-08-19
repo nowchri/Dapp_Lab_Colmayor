@@ -7,7 +7,7 @@ import QRScanner from "@/components/QRScanner";
 
 
 interface Activo {
-  id_activo: string; nombre_activo: string; tipo: string; estado: string; categoria_nombre: string | null;
+  id_activo: string; nombre_activo: string; codigo_qr: string | null; tipo: string; estado: string; categoria_nombre: string | null; nombre_area: string | null; componentes: number;
 }
 
 // ─── Same category colors as inventario ───
@@ -65,6 +65,37 @@ function NuevoPrestamoContent() {
     }
   }, []);
 
+  // Listen for live scan events from FabScanner
+  useEffect(() => {
+    function handleScan() {
+      var stored = localStorage.getItem("scannedBag");
+      if (!stored) return;
+      var codes = JSON.parse(stored);
+      if (codes.length === 0) return;
+      localStorage.removeItem("scannedBag");
+      codes.forEach(function(code) {
+        var sc = code.toLowerCase().trim();
+        setCatalogo(function(prev) {
+          var found = prev.find(function(c) {
+            var cqr = ((c as any).codigo_qr || "").toLowerCase().trim();
+            return cqr === sc || c.id_activo === sc || cqr.indexOf(sc) >= 0 || sc.indexOf(cqr) >= 0;
+          });
+          if (found) {
+            setCarrito(function(prevC) {
+              if (prevC.find(function(p) { return p.activo.id_activo === found.id_activo; })) return prevC;
+              toast.success(found.nombre_activo + " escaneado!");
+              return prevC.concat([{ activo: found, cantidad: 1 }]);
+            });
+          }
+          return prev;
+        });
+      });
+    }
+    window.addEventListener("scannedItemsChanged", handleScan);
+    handleScan();
+    return function() { window.removeEventListener("scannedItemsChanged", handleScan); };
+  }, []);
+
   useEffect(() => {
     const ids = sp.get("items");
     if (ids) {
@@ -98,18 +129,28 @@ function NuevoPrestamoContent() {
   }, [sp, catalogo]);
 
   const onScan = useCallback((code: string) => {
-    const found = catalogo.find(a => a.codigo_qr === code || a.id_activo === code);
-    if (found) {
-      if (carrito.find(c => c.activo.id_activo === found.id_activo)) {
-        toast.error("Ya está en la bolsa");
+    const sc = code.toLowerCase().trim();
+    // Use setState callback to get latest catalogo
+    setCatalogo(prev => {
+      const found = prev.find(c => {
+        const cqr = (c.codigo_qr || "").toLowerCase().trim();
+        return cqr === sc || c.id_activo === sc || cqr.includes(sc) || sc.includes(cqr);
+      });
+      if (found) {
+        setCarrito(prevC => {
+          if (prevC.find(p => p.activo.id_activo === found.id_activo)) {
+            toast.error("Ya está en la bolsa");
+            return prevC;
+          }
+          toast.success(found.nombre_activo + " escaneado");
+          return [...prevC, { activo: found, cantidad: 1 }];
+        });
       } else {
-        setCarrito(prev => [...prev, { activo: found, cantidad: 1 }]);
-        toast.success(`${found.nombre_activo} escaneado`);
+        toast.error("Activo no encontrado: " + code);
       }
-    } else {
-      toast.error("Activo no encontrado: " + code);
-    }
-  }, [catalogo, carrito]);
+      return prev;
+    });
+  }, []);
 
   async function agregar(a: Activo) {
     if (carrito.find(c => c.activo.id_activo === a.id_activo)) {
@@ -141,14 +182,16 @@ function NuevoPrestamoContent() {
   async function enviar() {
     if (!carrito.length) return toast.error("Agregá al menos un activo");
     if (!form.fecha_limite) return toast.error("Seleccioná una fecha límite");
+    if (!form.materia?.trim()) return toast.error("La materia es obligatoria");
+    if (!form.profesor_encargado?.trim()) return toast.error("El profesor es obligatorio");
     setEnviando(true);
     try {
       const res = await fetch("/api/prestamos", { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items: carrito.map(c => ({ id_activo: c.activo.id_activo, cantidad_entregada: c.cantidad })),
           fecha_limite: form.fecha_limite, materia: form.materia || null, profesor_encargado: form.profesor_encargado || null, curso_grupo: form.curso_grupo || null })});
       if (!res.ok) { const err = await res.json(); return toast.error(err.error || "Error"); }
-      toast.success("Préstamo solicitado. Esperá la aprobación del monitor.");
-      router.push("/prestamos");
+      toast.success("Solicitud enviada — esperá que el monitor la confirme", { duration: 4000 });
+      setTimeout(() => router.push("/prestamos"), 2000);
     } catch { toast.error("Error de conexión"); }
     finally { setEnviando(false); }
   }
@@ -163,13 +206,14 @@ function NuevoPrestamoContent() {
           onScan={onScan}
           bagCount={carrito.length}
           onClose={() => setShowScanner(false)}
+          showBagLink={false}
         />
       )}
 
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-[#09488D]">Nuevo Préstamo</h1>
+            <h1 className="text-xl md:text-2xl font-bold text-[#09488D]">Nuevo Préstamo</h1>
             <p className="text-slate-400 text-sm mt-1">Seleccioná los materiales del laboratorio.</p>
           </div>
           <button onClick={() => setShowScanner(true)} className="btn-accent flex items-center gap-2 text-sm">
@@ -199,9 +243,9 @@ function NuevoPrestamoContent() {
             )}
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <div><label className="block text-xs font-medium text-slate-500 mb-1">Fecha límite *</label><input type="date" value={form.fecha_limite} onChange={e => setForm({...form, fecha_limite: e.target.value})} className="input-glass" /></div>
-              <div><label className="block text-xs font-medium text-slate-500 mb-1">Materia</label><input type="text" value={form.materia} onChange={e => setForm({...form, materia: e.target.value})} className="input-glass" placeholder="Ej: Física II" /></div>
-              <div><label className="block text-xs font-medium text-slate-500 mb-1">Profesor</label><input type="text" value={form.profesor_encargado} onChange={e => setForm({...form, profesor_encargado: e.target.value})} className="input-glass" placeholder="Ej: Carlos López" /></div>
-              <div><label className="block text-xs font-medium text-slate-500 mb-1">Curso / Grupo</label><input type="text" value={form.curso_grupo} onChange={e => setForm({...form, curso_grupo: e.target.value})} className="input-glass" placeholder="Ej: 2026-A" /></div>
+              <div><label className="block text-xs font-medium text-slate-500 mb-1">Materia *</label><input type="text" value={form.materia} onChange={e => setForm({...form, materia: e.target.value})} className="input-glass" placeholder="Ej: Física II" /></div>
+              <div><label className="block text-xs font-medium text-slate-500 mb-1">Profesor *</label><input type="text" value={form.profesor_encargado} onChange={e => setForm({...form, profesor_encargado: e.target.value})} className="input-glass" placeholder="Ej: Carlos López" /></div>
+              <div><label className="block text-xs font-medium text-slate-500 mb-1">Curso / Cohorte *</label><input type="text" value={form.curso_grupo} onChange={e => setForm({...form, curso_grupo: e.target.value})} className="input-glass" placeholder="Ej: Cohorte nocturna" /></div>
             </div>
             <button onClick={enviar} disabled={enviando || carrito.length === 0} className="btn-primary w-full text-sm">{enviando ? "Solicitando..." : "Solicitar Préstamo"}</button>
             <button onClick={() => router.back()} className="btn-ghost w-full text-sm">Cancelar</button>

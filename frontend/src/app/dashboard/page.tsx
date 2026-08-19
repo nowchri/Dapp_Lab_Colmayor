@@ -20,10 +20,10 @@ function SystemStatus() {
     <div className="card-glass">
       <h3 className="font-bold text-[#09488D] mb-4">Resumen del Sistema</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-        <div><p className="text-2xl font-bold text-[#09488D]">{stats.total_activos || 0}</p><p className="text-xs text-gray-500 mt-1">Activos</p></div>
-        <div><p className="text-2xl font-bold text-emerald-600">{stats.disponibles || stats.activos_disponibles || 0}</p><p className="text-xs text-gray-500 mt-1">Disponibles</p></div>
-        <div><p className="text-2xl font-bold text-[#09488D]">{stats.prestamos_activos || 0}</p><p className="text-xs text-gray-500 mt-1">Préstamos</p></div>
-        <div><p className="text-2xl font-bold text-rose-600">{stats.en_mora || 0}</p><p className="text-xs text-gray-500 mt-1">En Mora</p></div>
+        <div><p className="text-xl md:text-2xl font-bold text-[#09488D]">{stats.total_activos || 0}</p><p className="text-xs text-gray-500 mt-1">Activos</p></div>
+        <div><p className="text-xl md:text-2xl font-bold text-emerald-600">{stats.disponibles || stats.activos_disponibles || 0}</p><p className="text-xs text-gray-500 mt-1">Disponibles</p></div>
+        <div><p className="text-xl md:text-2xl font-bold text-[#09488D]">{stats.prestamos_activos || 0}</p><p className="text-xs text-gray-500 mt-1">Préstamos</p></div>
+        <div><p className="text-xl md:text-2xl font-bold text-rose-600">{stats.en_mora || 0}</p><p className="text-xs text-gray-500 mt-1">En Mora</p></div>
       </div>
 
         <FabScanner />
@@ -156,14 +156,14 @@ function BlockchainStatus() {
   return (
     <div className="card-glass space-y-4">
       <h3 className="font-bold text-[#09488D] text-lg">⛓️ Smart Contract — Polygon Amoy</h3>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-[#09488D]/5 rounded-xl p-4">
           <p className="text-xs text-slate-500">Wallet del servidor</p>
           <p className="font-mono text-xs text-[#09488D] font-bold mt-1">0x5d0A...baF</p>
         </div>
         <div className="bg-emerald-50 rounded-xl p-4">
           <p className="text-xs text-slate-500">Balance MATIC</p>
-          <p className="text-2xl font-bold text-emerald-600 mt-1">{balance} MATIC</p>
+          <p className="text-xl md:text-2xl font-bold text-emerald-600 mt-1">{balance} MATIC</p>
         </div>
       </div>
       <div className="bg-[#F4F6F9] rounded-xl p-4">
@@ -195,6 +195,61 @@ function BlockchainStatus() {
 }
 
 
+
+function HorarioMonitor({ rol }: { rol: string }) {
+  const [horario, setHorario] = useState("Cargando...");
+  const [editing, setEditing] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/configuracion")
+      .then(r => r.json())
+      .then(d => { setHorario(d.horario_monitor || ""); setTexto(d.horario_monitor || ""); })
+      .catch(() => {});
+  }, []);
+
+  async function guardar() {
+    setSaving(true);
+    try {
+      await fetch("/api/configuracion", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ horario_monitor: texto }) });
+      setHorario(texto);
+      setEditing(false);
+    } catch {}
+    finally { setSaving(false); }
+  }
+
+  if (editing) {
+    return (
+      <div className="card-glass">
+        <h3 className="font-bold text-[#09488D] mb-2">Editar horario de atención</h3>
+        <textarea value={texto} onChange={e => setTexto(e.target.value)} className="input-glass h-24 resize-none text-sm"
+          placeholder="Ej: Lunes a Viernes 8am-12pm y 2pm-6pm. Sábados 9am-12pm." />
+        <div className="flex gap-2 mt-2">
+          <button onClick={guardar} disabled={saving} className="btn-primary text-xs">{saving ? "Guardando..." : "Guardar"}</button>
+          <button onClick={() => { setTexto(horario); setEditing(false); }} className="btn-ghost text-xs">Cancelar</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!horario) return null;
+
+  return (
+    <div className="card-glass border-l-4 border-[#F7C800]">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="font-bold text-[#09488D] text-sm mb-1">🕐 Horario del Monitor</h3>
+          <p className="text-sm text-slate-600 whitespace-pre-line">{horario}</p>
+        </div>
+        {(rol === "monitor" || rol === "admin") && (
+          <button onClick={() => setEditing(true)} className="text-xs text-[#09488D] hover:underline shrink-0 ml-2">Editar</button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -215,14 +270,14 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-[#F4F6F9]">
       {/* Hero banner — full width, flush with navbar */}
-      <div className="gradient-hero text-white py-16 px-6 relative overflow-hidden">
+      <div className="gradient-hero text-white py-12 px-4 md:py-16 md:px-6 relative overflow-hidden">
         <img
           src="/img/Unimayor-Cauca.webp"
           alt="Unimayor"
           className="absolute inset-0 w-full h-full object-cover opacity-[0.25]"
         />
         <div className="max-w-5xl mx-auto relative z-10">
-          <h2 className="text-3xl font-bold">Bienvenido, {user.nombre_completo.split(" ")[0]} 👋</h2>
+          <h2 className="text-2xl md:text-3xl font-bold">Bienvenido, {user.nombre_completo.split(" ")[0]} 👋</h2>
           <p className="text-white/70 mt-3 text-balance max-w-xl text-lg">
             {user.rol === "estudiante" && "Explorá el catálogo de equipos, armá tu bolsa de materiales y gestioná tus préstamos del laboratorio."}
             {user.rol === "monitor" && "Aprobá préstamos, registrá devoluciones y mantené actualizado el inventario del laboratorio."}
@@ -258,6 +313,8 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+
+        <HorarioMonitor rol={user.rol} />
 
         {user.rol === "admin" && <BlockchainStatus />}
       </main>

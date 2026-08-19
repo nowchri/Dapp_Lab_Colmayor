@@ -68,7 +68,7 @@ export default function EstudiantesPage() {
             <span className="pill-primary">{estudiantes.length} registrados</span>
           </div>
           <input type="text" value={busqueda} onChange={e => setBusqueda(e.target.value)}
-            placeholder="Buscar por nombre, código o correo..." className="input-glass max-w-md" />
+            placeholder="Buscar por nombre, código o correo..." className="input-glass max-w-full md:max-w-md" />
         </div>
       </div>
 
@@ -90,7 +90,7 @@ export default function EstudiantesPage() {
           </div>
         )}
 
-        <div className="card-glass overflow-hidden" style={{ maxHeight: "60vh", overflowY: "auto" }}>
+        <div className="card-glass overflow-x-auto" style={{ maxHeight: "60vh", overflowY: "auto" }}>
           {filtrados.length === 0 ? (
             <p className="text-center py-8 text-slate-400">No se encontraron estudiantes.</p>
           ) : (
