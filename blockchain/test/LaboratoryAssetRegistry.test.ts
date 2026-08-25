@@ -99,6 +99,100 @@ describe("LaboratoryAssetRegistry", function () {
     });
   });
 
+  describe("registerLoanBatch", function () {
+    const ASSET2 = ethers.keccak256(ethers.toUtf8Bytes("asset-002"));
+    const ASSET3 = ethers.keccak256(ethers.toUtf8Bytes("asset-003"));
+
+    it("registra todos los activos de la bolsa en una tx", async function () {
+      await contract.connect(monitor).registerLoanBatch(
+        LOAN_HASH, [ASSET_HASH, ASSET2, ASSET3], STUDENT_HASH
+      );
+      expect(await contract.assetLoaned(ASSET_HASH)).to.equal(true);
+      expect(await contract.assetLoaned(ASSET2)).to.equal(true);
+      expect(await contract.assetLoaned(ASSET3)).to.equal(true);
+      expect(await contract.totalLoans()).to.equal(3);
+    });
+
+    it("cada activo tiene su propio historial (trazabilidad individual)", async function () {
+      await contract.connect(monitor).registerLoanBatch(
+        LOAN_HASH, [ASSET_HASH, ASSET2], STUDENT_HASH
+      );
+      expect((await contract.getAssetHistory(ASSET_HASH)).length).to.equal(1);
+      expect((await contract.getAssetHistory(ASSET2)).length).to.equal(1);
+      expect((await contract.getAssetHistory(ASSET3)).length).to.equal(0);
+      const mov = await contract.getMovement(0);
+      expect(mov.assetHash).to.equal(ASSET_HASH);
+      const mov2 = await contract.getMovement(1);
+      expect(mov2.assetHash).to.equal(ASSET2);
+    });
+
+    it("emite un evento LoanRegistered por activo", async function () {
+      const tx = await contract.connect(monitor).registerLoanBatch(
+        LOAN_HASH, [ASSET_HASH, ASSET2], STUDENT_HASH
+      );
+      const receipt = await tx.wait();
+      const events = receipt.logs.filter((l: any) => l.fragment?.name === "LoanRegistered");
+      expect(events.length).to.equal(2);
+    });
+
+    it("revierte si un activo ya está prestado (atomicidad)", async function () {
+      await contract.connect(monitor).registerLoan(LOAN_HASH, ASSET_HASH, STUDENT_HASH);
+      await expect(
+        contract.connect(monitor).registerLoanBatch(LOAN_HASH, [ASSET2, ASSET_HASH], STUDENT_HASH)
+      ).to.be.revertedWithCustomError(contract, "AssetAlreadyLoaned");
+      // Nada del batch se registró
+      expect(await contract.assetLoaned(ASSET2)).to.equal(false);
+      expect(await contract.totalLoans()).to.equal(1);
+    });
+
+    it("solo monitor puede registrar batch", async function () {
+      await expect(
+        contract.connect(other).registerLoanBatch(LOAN_HASH, [ASSET_HASH], STUDENT_HASH)
+      ).to.be.revertedWithCustomError(contract, "OnlyMonitor");
+    });
+  });
+
+  describe("registerReturnBatch", function () {
+    const ASSET2 = ethers.keccak256(ethers.toUtf8Bytes("asset-002"));
+
+    beforeEach(async function () {
+      await contract.connect(monitor).registerLoanBatch(
+        LOAN_HASH, [ASSET_HASH, ASSET2], STUDENT_HASH
+      );
+    });
+
+    it("devuelve todos los activos en una tx", async function () {
+      await contract.connect(monitor).registerReturnBatch(
+        LOAN_HASH, [ASSET_HASH, ASSET2], STUDENT_HASH
+      );
+      expect(await contract.assetLoaned(ASSET_HASH)).to.equal(false);
+      expect(await contract.assetLoaned(ASSET2)).to.equal(false);
+      expect(await contract.totalReturns()).to.equal(2);
+    });
+
+    it("historial queda con loan + return por activo", async function () {
+      await contract.connect(monitor).registerReturnBatch(
+        LOAN_HASH, [ASSET_HASH, ASSET2], STUDENT_HASH
+      );
+      expect((await contract.getAssetHistory(ASSET_HASH)).length).to.equal(2);
+      expect((await contract.getAssetHistory(ASSET2)).length).to.equal(2);
+    });
+
+    it("revierte si un activo no estaba prestado", async function () {
+      const NUEVO = ethers.keccak256(ethers.toUtf8Bytes("asset-nuevo"));
+      await expect(
+        contract.connect(monitor).registerReturnBatch(LOAN_HASH, [ASSET_HASH, NUEVO], STUDENT_HASH)
+      ).to.be.revertedWithCustomError(contract, "AssetNotLoaned");
+      expect(await contract.totalReturns()).to.equal(0);
+    });
+
+    it("solo monitor puede registrar devolución batch", async function () {
+      await expect(
+        contract.connect(other).registerReturnBatch(LOAN_HASH, [ASSET_HASH], STUDENT_HASH)
+      ).to.be.revertedWithCustomError(contract, "OnlyMonitor");
+    });
+  });
+
   describe("getAssetHistory", function () {
     it("retorna historial de movimientos del activo", async function () {
       await contract.connect(monitor).registerLoan(LOAN_HASH, ASSET_HASH, STUDENT_HASH);

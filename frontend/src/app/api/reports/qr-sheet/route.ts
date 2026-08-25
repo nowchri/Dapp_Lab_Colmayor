@@ -20,7 +20,7 @@ export async function GET() {
       <div class="qr"><img src="${qrImg}" alt="QR" /></div>
       <div class="code">${qr}</div>
       <div class="name">${a.nombre_activo}</div>
-      <div class="cat">UNIMAYOR · LAB Sistemas Embebidos y Mecanica-Electro </div>
+      <div class="uni">Lab · Unimayor </div>
     </div>`;
   }).join("");
 
@@ -31,34 +31,48 @@ export async function GET() {
 <title>Stickers QR — Lab IUCMC</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; padding: 10mm; background: #f2eeee; }
-  h1 { font-size: 18px; color: #09488D; margin-bottom: 4px; }
-  .subtitle { font-size: 12px; color: #666; margin-bottom: 12px; }
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6mm; }
+  /* @page con margen 0: elimina el pie de página del navegador al imprimir */
+  @page { size: A4; margin: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; }
+  .screen-header { padding: 8mm 10mm 2mm; }
+  .screen-header h1 { font-size: 18px; color: #09488D; }
+  .screen-header p { font-size: 12px; color: #666; margin-top: 4px; }
+
+  /* 5 columnas x 6 filas = 24 stickers por página A4 */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 3mm;
+    padding: 3mm;
+  }
   .sticker {
-    border: 1.5px dashed #bbb;
-    border-radius: 8px;
-    padding: 6px;
+    border: 1.2px dashed #999;
+    border-radius: 5px;
+    padding: 1.2mm;
     text-align: center;
-    page-break-inside: avoid;
+    break-inside: avoid;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
+    height: 44mm;
   }
-  .qr img { width: 22mm; height: 22mm; }
-  .code { font-family: 'Courier New', monospace; font-size: 7px; color: #333; word-break: break-all; margin-top: 3px; }
-  .name { font-size: 10px; font-weight: 600; color: #09488D; margin-top: 3px; line-height: 1.2; }
-  .cat { font-size: 8px; color: #888; margin-top: 1px; }
+  .qr img { width: 16mm; height: 16mm; }
+  .code { font-family: 'Courier New', monospace; font-size: 5.5px; color: #333; word-break: break-all; margin-top: 1px; }
+  .name { font-size: 8px; font-weight: 600; color: #3e8ce0; margin-top: 1px; line-height: 1.15; }
+  .uni { font-size: 9px; font-weight: 400; color: #022e5d; margin-top: 1px; line-height: 1.15; } 
   @media print {
-    body { padding: 0; }
-    h1, .subtitle { display: none; }
-    .grid { gap: 4mm; }
+    body { background: #fff; }
+    .screen-header { display: none; }
+    .grid { padding: 5mm; }
   }
 </style>
 </head>
 <body>
-  <h1>🔬 Stickers QR — Laboratorio IUCMC</h1>
-  <p class="subtitle">Total: ${r.rows.length} activos · Imprimí y pegá cada sticker en su activo correspondiente · Dale Ctrl + P para imprimir</p>
+  <div class="screen-header">
+    <h1>🔬 Stickers QR — Laboratorio IUCMC</h1>
+    <p>Total: ${r.rows.length} activos · 24 stickers por página · Ctrl + P para imprimir (sin pie de página)</p>
+  </div>
   <div class="grid">${stickers}</div>
 </body>
 </html>`;

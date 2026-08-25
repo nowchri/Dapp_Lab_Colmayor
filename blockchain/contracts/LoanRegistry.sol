@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 /**
  * @title LaboratoryAssetRegistry
  * @notice Optimizado para registro individual gestionado por el Backend.
+ *         Soporta registro individual y por lotes (batch) en una sola tx.
  */
 contract LaboratoryAssetRegistry {
     error OnlyProfessor();
@@ -65,15 +66,38 @@ contract LaboratoryAssetRegistry {
         emit MonitorUpdated(monitor, enabled);
     }
 
-    /**
-     * @notice Registra un activo a la vez. 
-     * El backend debe llamar esta función en un loop si hay varios activos.
-     */
+    // ─────────────────────────────────────────────────────────
+    // Registro de préstamos
+    // ─────────────────────────────────────────────────────────
+
+    /** Registra UN activo. */
     function registerLoan(
         bytes32 loanHash,
         bytes32 assetHash,
         bytes32 studentHash
     ) external onlyMonitor {
+        _registerLoan(loanHash, assetHash, studentHash);
+    }
+
+    /**
+     * @notice Registra TODA la bolsa en UNA transacción.
+     * Cada activo recibe su propio Movement y evento (trazabilidad individual intacta).
+     */
+    function registerLoanBatch(
+        bytes32 loanHash,
+        bytes32[] calldata assetHashes,
+        bytes32 studentHash
+    ) external onlyMonitor {
+        for (uint256 i = 0; i < assetHashes.length; i++) {
+            _registerLoan(loanHash, assetHashes[i], studentHash);
+        }
+    }
+
+    function _registerLoan(
+        bytes32 loanHash,
+        bytes32 assetHash,
+        bytes32 studentHash
+    ) internal {
         // 1. Validar que el activo específico NO esté prestado
         if (assetLoaned[assetHash]) revert AssetAlreadyLoaned(assetHash);
 
@@ -101,11 +125,35 @@ contract LaboratoryAssetRegistry {
         emit LoanRegistered(assetHash, loanHash, studentHash);
     }
 
+    // ─────────────────────────────────────────────────────────
+    // Registro de devoluciones
+    // ─────────────────────────────────────────────────────────
+
+    /** Registra la devolución de UN activo. */
     function registerReturn(
         bytes32 loanHash,
         bytes32 assetHash,
         bytes32 studentHash
     ) external onlyMonitor {
+        _registerReturn(loanHash, assetHash, studentHash);
+    }
+
+    /** Registra la devolución de TODA la bolsa en UNA transacción. */
+    function registerReturnBatch(
+        bytes32 loanHash,
+        bytes32[] calldata assetHashes,
+        bytes32 studentHash
+    ) external onlyMonitor {
+        for (uint256 i = 0; i < assetHashes.length; i++) {
+            _registerReturn(loanHash, assetHashes[i], studentHash);
+        }
+    }
+
+    function _registerReturn(
+        bytes32 loanHash,
+        bytes32 assetHash,
+        bytes32 studentHash
+    ) internal {
         if (!assetLoaned[assetHash]) revert AssetNotLoaned(assetHash);
 
         movements.push(Movement({

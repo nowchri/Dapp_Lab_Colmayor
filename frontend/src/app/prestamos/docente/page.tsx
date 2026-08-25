@@ -8,6 +8,7 @@ import QRScanner from "@/components/QRScanner";
 interface Activo {
   id_activo: string; nombre_activo: string; codigo_qr: string | null; tipo: string; estado: string;
   nombre_categoria: string | null; nombre_area: string | null; componentes: number;
+  id_activo_padre: string | null;
 }
 
 export default function PrestamoDocentePage() {

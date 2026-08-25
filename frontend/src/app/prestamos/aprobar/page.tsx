@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
+import BlockchainProgress from "@/components/BlockchainProgress";
+
+const STEPS = ["Aceptando préstamo…", "Conectando con la blockchain…", "Registrando en la blockchain… ya casi estamos…", "Préstamo hecho en la blockchain"];
 
 interface Prestamo {
   id_prestamo: string; estudiante_nombre: string; estado_general: string;
@@ -14,6 +17,8 @@ export default function AprobarPage() {
   const [pendientes, setPendientes] = useState<Prestamo[]>([]);
   const [loading, setLoading] = useState(true);
   const [detalles, setDetalles] = useState<Record<string, any[]>>({});
+  const [proceso, setProceso] = useState<{ open: boolean; step: number; hash: string | null; error: string | null }>({ open: false, step: 0, hash: null, error: null });
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     fetch("/api/prestamos")
@@ -34,16 +39,29 @@ export default function AprobarPage() {
   }, []);
 
   async function aprobar(id: string) {
+    setProceso({ open: true, step: 0, hash: null, error: null });
+    timeoutsRef.current.push(
+      setTimeout(() => setProceso(p => ({ ...p, step: 1 })), 2500),
+      setTimeout(() => setProceso(p => ({ ...p, step: 2 })), 7000)
+    );
     try {
       const res = await fetch(`/api/prestamos/${id}/aprobar`, { method: "POST" });
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
       if (res.ok) {
-        toast.success("Préstamo aprobado");
+        const d = await res.json();
+        setProceso(p => ({ ...p, step: STEPS.length, hash: d.hash || null }));
+        toast.success("Préstamo aprobado y registrado en la blockchain");
         setPendientes(prev => prev.filter(p => p.id_prestamo !== id));
       } else {
-        const e = await res.json();
-        toast.error(e.error || "Error al aprobar");
+        const e = await res.json().catch(() => ({}));
+        setProceso(p => ({ ...p, step: -1, error: e.error || "Error al aprobar" }));
       }
-    } catch { toast.error("Error de conexión"); }
+    } catch {
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
+      setProceso(p => ({ ...p, step: -1, error: "Error de conexión" }));
+    }
   }
 
   async function rechazar(id: string) {
@@ -138,6 +156,16 @@ export default function AprobarPage() {
           })
         )}
       </div>
+
+      <BlockchainProgress
+        open={proceso.open}
+        title="Aprobando préstamo"
+        steps={STEPS}
+        currentStep={proceso.step}
+        error={proceso.error}
+        hash={proceso.hash}
+        onClose={() => setProceso({ open: false, step: 0, hash: null, error: null })}
+      />
     </div>
   );
 }

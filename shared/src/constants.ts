@@ -116,7 +116,7 @@ export const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 
 // --- Email (E5 RESUELTO) ---
 export const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY ||
-  "";
+  "git ";
 export const EMAIL_FROM = process.env.EMAIL_FROM || "cristian_santiago@unimayor.edu.co";
 export const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "cristiansantiago808@gmail.com";
 export const DECANATURA_EMAIL = process.env.DECANATURA_EMAIL || "testpruea@gmail.com";

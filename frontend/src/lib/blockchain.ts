@@ -2,22 +2,22 @@ import { ethers } from "ethers";
 
 const RPC_URL = process.env.NEXT_PUBLIC_POLYGON_RPC_URL || "https://polygon-amoy.g.alchemy.com/v2/demo";
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0x8f8ed9B2b92d068318eCA95BB31201d1C2B962c6";
-const SERVER_WALLET = process.env.NEXT_PUBLIC_SERVER_WALLET_ADDRESS || "";
+const SERVER_WALLET = process.env.SERVER_WALLET_ADDRESS || "";
 
 // Minimal ABI for contract events and read functions
 const ABI = [
   "function professor() view returns (address)",
   "function monitors(address) view returns (bool)",
-  "function getMovement(uint256 index) view returns (tuple(address actor, bytes32 loanHash, bytes32 assetHash, bytes32 studentHash, uint256 timestamp, bool isReturn))",
-  "event AssetRegistered(address indexed actor, bytes32 indexed loanHash, bytes32 assetHash, bytes32 studentHash, uint256 timestamp)",
-  "event AssetReturned(address indexed actor, bytes32 indexed loanHash, bytes32 assetHash, bytes32 studentHash, uint256 timestamp)",
+  "function getMovement(uint256 index) view returns (tuple(bytes32 loanHash, bytes32 assetHash, bytes32 studentHash, address monitor, uint64 timestamp, uint8 movementType))",
+  "event LoanRegistered(bytes32 indexed assetHash, bytes32 indexed loanHash, bytes32 indexed studentHash)",
+  "event ReturnRegistered(bytes32 indexed assetHash, bytes32 indexed loanHash)",
 ];
 
 let provider: ethers.JsonRpcProvider | null = null;
 let contract: ethers.Contract | null = null;
 
 function getProvider(): ethers.JsonRpcProvider {
-  if (!provider) provider = new ethers.JsonRpcProvider(RPC_URL);
+  if (!provider) provider = new ethers.JsonRpcProvider(RPC_URL, 80002, { staticNetwork: true });
   return provider;
 }
 
@@ -43,9 +43,8 @@ export async function getContractInfo() {
 
 export interface BlockchainEvent {
   event: string;
-  actor: string;
-  loanHash: string;
   assetHash: string;
+  loanHash: string;
   studentHash: string;
   timestamp: string;
 }
@@ -53,35 +52,37 @@ export interface BlockchainEvent {
 export async function getRecentEvents(limit = 5): Promise<BlockchainEvent[]> {
   try {
     const c = getContract();
-    const filterRegistered = c.filters.AssetRegistered();
-    const filterReturned = c.filters.AssetReturned();
+    const filterLoan = c.filters.LoanRegistered();
+    const filterReturn = c.filters.ReturnRegistered();
 
-    const [regEvents, retEvents] = await Promise.all([
-      c.queryFilter(filterRegistered, -5000),
-      c.queryFilter(filterReturned, -5000),
+    const [loanEvents, returnEvents] = await Promise.all([
+      c.queryFilter(filterLoan, -5000),
+      c.queryFilter(filterReturn, -5000),
     ]);
 
     const all: BlockchainEvent[] = [];
 
-    for (const e of regEvents) {
+    const withTs = async (e: any) => {
+      try { const b = await e.getBlock(); return Number(b.timestamp) * 1000; } catch { return Date.now(); }
+    };
+
+    for (const e of loanEvents) {
       all.push({
         event: "Prestamo",
-        actor: (e as any).args?.actor || "",
-        loanHash: (e as any).args?.loanHash || "",
         assetHash: (e as any).args?.assetHash || "",
+        loanHash: (e as any).args?.loanHash || "",
         studentHash: (e as any).args?.studentHash || "",
-        timestamp: new Date(Number((e as any).args?.timestamp || 0) * 1000).toLocaleString("es-CO"),
+        timestamp: new Date(await withTs(e)).toLocaleString("es-CO"),
       });
     }
 
-    for (const e of retEvents) {
+    for (const e of returnEvents) {
       all.push({
         event: "Devolucion",
-        actor: (e as any).args?.actor || "",
-        loanHash: (e as any).args?.loanHash || "",
         assetHash: (e as any).args?.assetHash || "",
-        studentHash: (e as any).args?.studentHash || "",
-        timestamp: new Date(Number((e as any).args?.timestamp || 0) * 1000).toLocaleString("es-CO"),
+        loanHash: (e as any).args?.loanHash || "",
+        studentHash: "",
+        timestamp: new Date(await withTs(e)).toLocaleString("es-CO"),
       });
     }
 

@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import BlockchainProgress from "@/components/BlockchainProgress";
+
+const STEPS = ["Haciendo la conexión con la blockchain…", "Registrando la devolución…", "Confirmando transacciones…", "Devolución hecha en la blockchain"];
 
 interface Prestamo {
   id_prestamo: string; estudiante_nombre: string; estudiante_codigo: string;
@@ -22,6 +25,8 @@ export default function DevolverPage() {
   const [estados, setEstados] = useState<Record<string, string>>({});
   const [observacionesPerItem, setObservacionesPerItem] = useState<Record<string, string>>({});
   const [busqueda, setBusqueda] = useState("");
+  const [proceso, setProceso] = useState<{ open: boolean; step: number; hash: string | null; error: string | null }>({ open: false, step: 0, hash: null, error: null });
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     fetch("/api/prestamos")
@@ -71,20 +76,33 @@ export default function DevolverPage() {
       observacion: devueltos.has(d.id_detalle) ? (observacionesPerItem[d.id_detalle] || null) : null,
       estado_final: estados[d.id_detalle] || "disponible",
     }));
+    setProceso({ open: true, step: 0, hash: null, error: null });
+    timeoutsRef.current.push(
+      setTimeout(() => setProceso(p => ({ ...p, step: 1 })), 3000),
+      setTimeout(() => setProceso(p => ({ ...p, step: 2 })), 8000)
+    );
     try {
       const res = await fetch(`/api/prestamos/${seleccionado}/devolver`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ items_devueltos: items }),
       });
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
       if (res.ok) {
-        toast.success("Devolución registrada");
+        const d = await res.json();
+        setProceso(p => ({ ...p, step: STEPS.length, hash: d.hash || null }));
+        toast.success("Devolución registrada en la blockchain");
         setSeleccionado(null); setDetalles([]);
         fetch("/api/prestamos").then(r => r.json()).then(d => setPrestamos(d.filter((p: Prestamo) => p.estado_general === "activo")));
       } else {
-        const e = await res.json();
-        toast.error(e.error || "Error");
+        const e = await res.json().catch(() => ({}));
+        setProceso(p => ({ ...p, step: -1, error: e.error || "Error al registrar la devolución" }));
       }
-    } catch { toast.error("Error de conexión"); }
+    } catch {
+      timeoutsRef.current.forEach(clearTimeout);
+      timeoutsRef.current = [];
+      setProceso(p => ({ ...p, step: -1, error: "Error de conexión" }));
+    }
   }
 
   function diasRestantes(fechaLimite: string) {
@@ -228,6 +246,16 @@ export default function DevolverPage() {
           </div>
         )}
       </div>
+
+      <BlockchainProgress
+        open={proceso.open}
+        title="Registrando devolución"
+        steps={STEPS}
+        currentStep={proceso.step}
+        error={proceso.error}
+        hash={proceso.hash}
+        onClose={() => setProceso({ open: false, step: 0, hash: null, error: null })}
+      />
     </div>
   );
 }

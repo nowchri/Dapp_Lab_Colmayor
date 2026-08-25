@@ -8,6 +8,7 @@ interface Prestamo {
   id_prestamo: string; estudiante_nombre: string; monitor_nombre: string | null;
   estado_general: string; fecha_inicio: string; fecha_limite: string; materia: string | null; profesor_encargado: string | null;
   motivo_rechazo: string | null; id_monitor_validador: string | null; nombre_docente: string | null;
+  blockchain_hash: string | null;
 }
 
 interface DetallesPopupProps {
@@ -54,6 +55,31 @@ function DetallesPopup({ prestamo, onClose }: DetallesPopupProps) {
           </div>
         )}
 
+        {prestamo.blockchain_hash && (
+          <div className="bg-[#F4F6F9] border border-slate-200 rounded-xl p-3">
+            <p className="text-xs font-medium text-slate-600 mb-1.5">
+              🔐 Tus préstamos están seguros en la blockchain y los puedes consultar en Amoy con este código:
+            </p>
+            <div className="space-y-1">
+              {prestamo.blockchain_hash.split(",").filter(Boolean).map((h, i) => (
+                <a key={h} href={`https://amoy.polygonscan.com/tx/${h}`} target="_blank" rel="noopener noreferrer"
+                  className="block font-mono text-[11px] text-[#09488D] underline break-all hover:text-[#073a6b]">
+                  Tx #{i + 1}: {h.slice(0, 16)}…{h.slice(-6)}
+                </a>
+              ))}
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(prestamo.blockchain_hash || "");
+                toast.success("Código de la transacción copiado");
+              }}
+              className="text-xs mt-2 bg-[#09488D] text-white px-3 py-1.5 rounded-lg hover:bg-[#073a6b] transition"
+            >
+              📋 Copiar código
+            </button>
+          </div>
+        )}
+
         <div>
           <p className="text-xs text-slate-400 font-medium mb-2">Artículos prestados:</p>
           {detalles.length === 0 ? (
@@ -80,8 +106,6 @@ const STATUS: Record<string, { label: string; icon: string; pill: string }> = {
   pendiente: { label: "Pendiente", icon: "⏳", pill: "pill-accent" },
   activo: { label: "Activo", icon: "📦", pill: "pill-primary" },
   devuelto: { label: "Devuelto", icon: "✅", pill: "pill-success" },
-  pendiente: { label: "Pendiente", icon: "⏳", pill: "pill-accent" },
-  mora: { label: "En Mora", icon: "🚨", pill: "pill-danger" },
   mora: { label: "En Mora", icon: "🚨", pill: "pill-danger" },
   rechazado: { label: "Rechazado", icon: "✕", pill: "pill-danger" },
 };

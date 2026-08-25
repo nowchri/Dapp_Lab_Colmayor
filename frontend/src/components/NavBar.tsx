@@ -65,7 +65,7 @@ export default function NavBar() {
 
   const linkClass = (href: string) =>
     `px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-200 ${
-      pathname === href || (href !== "/dashboard" && pathname.startsWith(href))
+      pathname === href || (href !== "/dashboard" && (pathname || "").startsWith(href))
         ? "bg-white/15 text-white"
         : "text-white/75 hover:text-white hover:bg-white/8"
     }`;

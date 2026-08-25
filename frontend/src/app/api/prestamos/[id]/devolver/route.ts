@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { cookies } from "next/headers";
+import {
+  computeLoanHash,
+  computeAssetHash,
+  computeStudentHash,
+  registerManyReturnsOnChain,
+} from "@/lib/polygon";
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const ck = cookies();
@@ -13,8 +19,44 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const { items_devueltos } = body;
   const id_prestamo = params.id;
   const pool = getPool();
+  let returnHashesOnChain: string[] = [];
+
+  // 0. Datos del préstamo (para hashes on-chain)
+  const prestamo = await pool.query("SELECT id_estudiante FROM prestamos WHERE id_prestamo = $1", [id_prestamo]);
+  const idEstudiante = prestamo.rows.length > 0 ? prestamo.rows[0].id_estudiante : "0";
+
+  const loanHash = computeLoanHash(id_prestamo);
+  const studentHash = computeStudentHash(idEstudiante);
 
   if (items_devueltos) {
+    // 1. Registrar devoluciones on-chain (1 tx por activo).
+    //    Si falla (ej. préstamo anterior sin registro en cadena), se loguea
+    //    pero la devolución en BD se completa igual.
+    const assetHashes: string[] = [];
+    const detalleIds: string[] = [];
+    for (const item of items_devueltos) {
+      const info = await pool.query(
+        "SELECT a.codigo_qr, a.id_activo FROM activos a JOIN detalles_prestamo dp ON dp.id_activo = a.id_activo WHERE dp.id_detalle = $1",
+        [item.id_detalle]
+      );
+      if (info.rows.length > 0) {
+        assetHashes.push(computeAssetHash(info.rows[0].codigo_qr || info.rows[0].id_activo));
+        detalleIds.push(item.id_detalle);
+      }
+    }
+    if (assetHashes.length > 0) {
+      let returnHashes: string[] = [];
+      try {
+        const results = await registerManyReturnsOnChain(loanHash, assetHashes, studentHash);
+        returnHashes = results.map(r => r.txHash);
+        console.log(`[Polygon] Devolución registrada: ${results.length} tx`);
+      } catch (err: any) {
+        console.error("[Polygon] Error registrando devolución on-chain (se continúa en BD):", err?.message || err);
+      }
+      returnHashesOnChain = returnHashes;
+    }
+
+    // 2. Actualizar BD
     for (const item of items_devueltos) {
       const estadoFinal = item.estado_final || "disponible";
       const obs = item.observacion || null;
@@ -30,13 +72,6 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         [estadoFinal, item.id_detalle]
       );
 
-      // Consumibles: aumentar stock al devolver
-      await pool.query(
-        `UPDATE activos SET stock_actual = stock_actual + (SELECT cantidad_entregada FROM detalles_prestamo WHERE id_detalle = $1)
-         WHERE id_activo = (SELECT id_activo FROM detalles_prestamo WHERE id_detalle = $1) AND tipo = 'consumible'`,
-        [item.id_detalle]
-      );
-
       // If observacion provided, also update the asset's observaciones_iniciales
       if (obs) {
         await pool.query(
@@ -44,6 +79,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           [obs, item.id_detalle]
         );
       }
+
+      // Consumibles: aumentar stock al devolver
+      await pool.query(
+        `UPDATE activos SET stock_actual = stock_actual + (SELECT cantidad_entregada FROM detalles_prestamo WHERE id_detalle = $1)
+         WHERE id_activo = (SELECT id_activo FROM detalles_prestamo WHERE id_detalle = $1) AND tipo = 'consumible'`,
+        [item.id_detalle]
+      );
 
       // Check if parent kit should be restored
       const parentInfo = await pool.query(
@@ -73,5 +115,5 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       [userId, id_prestamo]
     );
   }
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, hash: returnHashesOnChain.join(",") || null });
 }

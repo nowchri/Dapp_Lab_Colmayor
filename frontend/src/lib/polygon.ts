@@ -1,19 +1,13 @@
 /**
- * polygon.ts — Polygon Amoy RPC + Server-side Wallet
+ * polygon.ts — Polygon Amoy RPC + Server-side Wallet + LaboratorioOnChain
  *
  * ⚠️  SOLO PARA API ROUTES (server-side). NUNCA en cliente.
  *
- * PUNTO DE CONEXION: Polygon Amoy Testnet (E2 RESUELTO)
- *   RPC endpoint: https://polygon-amoy.g.alchemy.com/v2/alch_Iz_Z3n06ZnpaR0nj-vDFW
- *   Ya configurado y funcionando.
- *
- * E3: Wallet server-side — generar con script generate-wallet.ts
- *   y pegar SERVER_PRIVATE_KEY en .env
- *
- * D3 RESUELTO: MVP con 1 wallet principal (docente).
- *   La wallet del monitor se rota cada semestre pero es gestionada
- *   por el docente desde el panel de administración.
- *   Por ahora: 1 wallet maestra + 1 wallet monitor (2 mínimo).
+ * Contrato desplegado: LaboratoryAssetRegistry
+ *   - registerLoan(bytes32 loanHash, bytes32 assetHash, bytes32 studentHash) onlyMonitor
+ *   - registerReturn(bytes32 loanHash, bytes32 assetHash, bytes32 studentHash) onlyMonitor
+ *   - getMovement(uint256) / getAssetHistory(bytes32)
+ *   - eventos LoanRegistered / ReturnRegistered
  *
  * ARQUITECTURA GASLESS (RNF-05):
  *   El servidor firma y paga el gas. Usuario NUNCA toca blockchain.
@@ -47,17 +41,23 @@ export function getWallet(privateKey?: string): Wallet {
   return new Wallet(pk, getProvider());
 }
 
-// --- Smart Contract ---
+// --- Smart Contract (ABI real del LaboratoryAssetRegistry) ---
 
 let contract: Contract | null = null;
 
 const LOAN_REGISTRY_ABI = [
-  "function registerLoan(bytes32 loanHash, address estudiante) external",
-  "function registerReturn(bytes32 loanHash) external",
-  "function verifyLoan(bytes32 loanHash) external view returns (bool exists, bool returned, uint256 timestamp, uint256 returnTimestamp)",
-  "function getLoanRecord(bytes32 loanHash) external view returns (tuple(bytes32 loanHash, address estudiante, address monitor, uint256 timestamp, bool returned, uint256 returnTimestamp))",
-  "event LoanRegistered(bytes32 indexed loanHash, address indexed estudiante, address indexed monitor, uint256 timestamp)",
-  "event LoanReturned(bytes32 indexed loanHash, uint256 returnTimestamp)",
+  "function professor() view returns (address)",
+  "function monitors(address) view returns (bool)",
+  "function registerLoan(bytes32 loanHash, bytes32 assetHash, bytes32 studentHash) external",
+  "function registerReturn(bytes32 loanHash, bytes32 assetHash, bytes32 studentHash) external",
+  "function registerLoanBatch(bytes32 loanHash, bytes32[] assetHashes, bytes32 studentHash) external",
+  "function registerReturnBatch(bytes32 loanHash, bytes32[] assetHashes, bytes32 studentHash) external",
+  "function getAssetHistory(bytes32 assetHash) view returns (uint256[])",
+  "function getMovement(uint256 index) view returns (tuple(bytes32 loanHash, bytes32 assetHash, bytes32 studentHash, address monitor, uint64 timestamp, uint8 movementType))",
+  "function totalLoans() view returns (uint256)",
+  "function totalReturns() view returns (uint256)",
+  "event LoanRegistered(bytes32 indexed assetHash, bytes32 indexed loanHash, bytes32 indexed studentHash)",
+  "event ReturnRegistered(bytes32 indexed assetHash, bytes32 indexed loanHash)",
 ];
 
 export function getContract(): Contract {
@@ -74,61 +74,149 @@ export function getContract(): Contract {
   return contract;
 }
 
-// --- Firma y envío de transacciones ---
+// --- Hashing (RF-10: hashes keccak256, nunca datos personales en cadena) ---
 
-export async function registerLoanOnChain(
-  loanHash: string,
-  estudianteId: string
-): Promise<{ txHash: string; blockNumber: number }> {
-  const c = getContract();
-
-  // Derivar dirección proxy del estudiante (nunca expone identidad real — RNF-06)
-  const estudianteProxy = ethers.zeroPadValue(
-    ethers.keccak256(ethers.toUtf8Bytes(estudianteId)).slice(0, 42),
-    20
-  );
-
-  console.log(`[Polygon] Registrando préstamo: hash=${loanHash}`);
-  const tx = await c.registerLoan(loanHash, estudianteProxy);
-  const receipt = await tx.wait();
-
-  console.log(`[Polygon] Confirmado: tx=${tx.hash}, block=${receipt.blockNumber}`);
-  return { txHash: tx.hash, blockNumber: receipt.blockNumber };
+/** Hash de la bolsa de préstamo (id_prestamo de Postgres). */
+export function computeLoanHash(loanId: string | number): string {
+  return ethers.keccak256(ethers.toUtf8Bytes(`loan:${loanId}`));
 }
 
-export async function registerReturnOnChain(
-  loanHash: string
-): Promise<{ txHash: string; blockNumber: number }> {
-  const c = getContract();
-  console.log(`[Polygon] Registrando devolución: hash=${loanHash}`);
-  const tx = await c.registerReturn(loanHash);
-  const receipt = await tx.wait();
-
-  console.log(`[Polygon] Confirmado: tx=${tx.hash}, block=${receipt.blockNumber}`);
-  return { txHash: tx.hash, blockNumber: receipt.blockNumber };
+/** Hash único del activo físico (su QR). */
+export function computeAssetHash(qrOrId: string): string {
+  return ethers.keccak256(ethers.toUtf8Bytes(`asset:${qrOrId}`));
 }
 
-export async function verifyLoanOnChain(loanHash: string) {
-  const c = getContract();
-  const result = await c.verifyLoan(loanHash);
+/** Hash del estudiante (id_perfil). */
+export function computeStudentHash(studentId: string | number): string {
+  return ethers.keccak256(ethers.toUtf8Bytes(`student:${studentId}`));
+}
+
+
+// --- Tarifas de gas (optimización) ---
+// Amoy exige un tip mínimo (hoy 25 gwei). El default de ethers usa la
+// sugerencia del RPC (33-36 gwei) → fijamos el piso y reintentamos si sube.
+const MIN_TIP = ethers.parseUnits("25", "gwei");
+
+async function getFeeOverrides() {
+  const block = await getProvider().getBlock("latest");
+  const base = block?.baseFeePerGas || 0n;
   return {
-    exists: result.exists,
-    returned: result.returned,
-    timestamp: Number(result.timestamp),
-    returnTimestamp: Number(result.returnTimestamp),
+    maxPriorityFeePerGas: MIN_TIP,
+    maxFeePerGas: base * 2n + MIN_TIP + ethers.parseUnits("1", "gwei"),
   };
 }
 
-// --- Cálculo del hash (RF-10) ---
+async function sendWithRetry(call: (overrides: any) => Promise<any>): Promise<any> {
+  const overrides = await getFeeOverrides();
+  try {
+    return await call(overrides);
+  } catch (err: any) {
+    if (err?.message?.includes("below minimum")) {
+      console.log("[Polygon] El piso de gas subió, reintentando con sugerencia del RPC");
+      const suggested = await getProvider().send("eth_maxPriorityFeePerGas", []);
+      return await call({
+        maxPriorityFeePerGas: suggested,
+        maxFeePerGas: suggested * 2n + ethers.parseUnits("1", "gwei"),
+      });
+    }
+    throw err;
+  }
+}
 
-export function computeLoanHash(
-  loanId: string,
-  estudianteId: string,
-  monitorId: string,
-  assetIds: string[],
-  timestamp: number
-): string {
-  const sorted = [...assetIds].sort();
-  const payload = `${loanId}:${estudianteId}:${monitorId}:${sorted.join(",")}:${timestamp}`;
-  return ethers.keccak256(ethers.toUtf8Bytes(payload));
+// --- Registro on-chain ---
+
+export interface TxResult {
+  txHash: string;
+  blockNumber: number;
+}
+
+/** Registra UN préstamo de UN activo. */
+export async function registerLoanOnChain(
+  loanHash: string,
+  assetHash: string,
+  studentHash: string
+): Promise<TxResult> {
+  const c = getContract();
+  console.log(`[Polygon] registerLoan: loan=${loanHash.slice(0, 10)}… asset=${assetHash.slice(0, 10)}…`);
+  const tx = await sendWithRetry((ov) => c.registerLoan(loanHash, assetHash, studentHash, ov));
+  const receipt = await tx.wait();
+  console.log(`[Polygon] Confirmado: tx=${tx.hash}, block=${receipt.blockNumber}`);
+  return { txHash: tx.hash, blockNumber: receipt.blockNumber };
+}
+
+/**
+ * Registra TODA la bolsa en UNA transacción (registerLoanBatch).
+ * Cada activo recibe su propio Movement y evento dentro del contrato.
+ */
+export async function registerManyLoansOnChain(
+  loanHash: string,
+  assetHashes: string[],
+  studentHash: string
+): Promise<TxResult[]> {
+  if (assetHashes.length === 0) return [];
+  const c = getContract();
+  console.log(`[Polygon] registerLoanBatch: ${assetHashes.length} activos, loan=${loanHash.slice(0, 10)}…`);
+  const tx = await sendWithRetry((ov) => c.registerLoanBatch(loanHash, assetHashes, studentHash, ov));
+  const receipt = await tx.wait();
+  console.log(`[Polygon] Confirmado: tx=${tx.hash}, block=${receipt.blockNumber}`);
+  return [{ txHash: tx.hash, blockNumber: receipt.blockNumber }];
+}
+
+/** Registra la devolución de UN activo. */
+export async function registerReturnOnChain(
+  loanHash: string,
+  assetHash: string,
+  studentHash: string
+): Promise<TxResult> {
+  const c = getContract();
+  console.log(`[Polygon] registerReturn: loan=${loanHash.slice(0, 10)}… asset=${assetHash.slice(0, 10)}…`);
+  const tx = await sendWithRetry((ov) => c.registerReturn(loanHash, assetHash, studentHash, ov));
+  const receipt = await tx.wait();
+  console.log(`[Polygon] Confirmado: tx=${tx.hash}, block=${receipt.blockNumber}`);
+  return { txHash: tx.hash, blockNumber: receipt.blockNumber };
+}
+
+/** Registra las devoluciones de TODA la bolsa en UNA transacción. */
+export async function registerManyReturnsOnChain(
+  loanHash: string,
+  assetHashes: string[],
+  studentHash: string
+): Promise<TxResult[]> {
+  if (assetHashes.length === 0) return [];
+  const c = getContract();
+  console.log(`[Polygon] registerReturnBatch: ${assetHashes.length} activos, loan=${loanHash.slice(0, 10)}…`);
+  const tx = await sendWithRetry((ov) => c.registerReturnBatch(loanHash, assetHashes, studentHash, ov));
+  const receipt = await tx.wait();
+  console.log(`[Polygon] Confirmado: tx=${tx.hash}, block=${receipt.blockNumber}`);
+  return [{ txHash: tx.hash, blockNumber: receipt.blockNumber }];
+}
+
+// --- Verificación / consulta ---
+
+export interface OnChainMovement {
+  loanHash: string;
+  assetHash: string;
+  studentHash: string;
+  monitor: string;
+  timestamp: number;
+  movementType: number; // 0 = Loan, 1 = Return
+}
+
+export async function getMovementOnChain(index: number): Promise<OnChainMovement> {
+  const c = getContract();
+  const m = await c.getMovement(index);
+  return {
+    loanHash: m.loanHash,
+    assetHash: m.assetHash,
+    studentHash: m.studentHash,
+    monitor: m.monitor,
+    timestamp: Number(m.timestamp),
+    movementType: Number(m.movementType),
+  };
+}
+
+export async function getAssetHistoryOnChain(assetHash: string): Promise<number[]> {
+  const c = getContract();
+  const idx = await c.getAssetHistory(assetHash);
+  return idx.map((i: any) => Number(i));
 }

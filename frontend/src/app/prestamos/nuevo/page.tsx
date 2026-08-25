@@ -70,7 +70,7 @@ function NuevoPrestamoContent() {
     function handleScan() {
       var stored = localStorage.getItem("scannedBag");
       if (!stored) return;
-      var codes = JSON.parse(stored);
+      var codes: string[] = JSON.parse(stored);
       if (codes.length === 0) return;
       localStorage.removeItem("scannedBag");
       codes.forEach(function(code) {
@@ -81,10 +81,13 @@ function NuevoPrestamoContent() {
             return cqr === sc || c.id_activo === sc || cqr.indexOf(sc) >= 0 || sc.indexOf(cqr) >= 0;
           });
           if (found) {
+            var fobj = found;
+            var fid = fobj.id_activo;
+            var fname = fobj.nombre_activo;
             setCarrito(function(prevC) {
-              if (prevC.find(function(p) { return p.activo.id_activo === found.id_activo; })) return prevC;
-              toast.success(found.nombre_activo + " escaneado!");
-              return prevC.concat([{ activo: found, cantidad: 1 }]);
+              if (prevC.find(function(p) { return p.activo.id_activo === fid; })) return prevC;
+              toast.success(fname + " escaneado!");
+              return prevC.concat([{ activo: fobj, cantidad: 1 }]);
             });
           }
           return prev;
@@ -97,7 +100,7 @@ function NuevoPrestamoContent() {
   }, []);
 
   useEffect(() => {
-    const ids = sp.get("items");
+    const ids = sp?.get("items");
     if (ids) {
       const idArr = ids.split(",");
       const t = setTimeout(async () => {
