@@ -10,7 +10,10 @@
  *   - sendAlertaMora (RF-14, D8: solo envía correos, no bloquea)s
  */
 
-import { SENDGRID_API_KEY, EMAIL_FROM, ADMIN_EMAIL, DECANATURA_EMAIL } from "@shared/constants";
+const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || "";
+const EMAIL_FROM = process.env.EMAIL_FROM || "cristian_santiago@unimayor.edu.co";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "cristiansantiago808@gmail.com";
+const DECANATURA_EMAIL = process.env.DECANATURA_EMAIL || "testpruea@gmail.com";
 
 async function sendEmail(
   to: string,

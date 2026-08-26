@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { cookies } from "next/headers";
-import {
-  computeLoanHash,
-  computeAssetHash,
-  computeStudentHash,
-  registerManyReturnsOnChain,
-} from "@/lib/polygon";
+import { computeLoanHash, computeAssetHash, computeStudentHash } from "@/lib/polygon";
+import { registrarEnCadena } from "@/lib/cadena";
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const ck = cookies();
@@ -47,11 +43,10 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (assetHashes.length > 0) {
       let returnHashes: string[] = [];
       try {
-        const results = await registerManyReturnsOnChain(loanHash, assetHashes, studentHash);
-        returnHashes = results.map(r => r.txHash);
-        console.log(`[Polygon] Devolución registrada: ${results.length} tx`);
+        returnHashes = await registrarEnCadena("return", id_prestamo, loanHash, assetHashes, studentHash);
+        console.log(`[cadena] Devolución registrada: ${returnHashes.length} eslabones`);
       } catch (err: any) {
-        console.error("[Polygon] Error registrando devolución on-chain (se continúa en BD):", err?.message || err);
+        console.error("[cadena] Error registrando devolución (se continúa en BD):", err?.message || err);
       }
       returnHashesOnChain = returnHashes;
     }

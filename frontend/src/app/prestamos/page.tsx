@@ -62,12 +62,14 @@ function DetallesPopup({ prestamo, onClose }: DetallesPopupProps) {
             </p>
             <div className="space-y-1">
               {prestamo.blockchain_hash.split(",").filter(Boolean).map((h, i) => (
-                <a key={h} href={`https://amoy.polygonscan.com/tx/${h}`} target="_blank" rel="noopener noreferrer"
-                  className="block font-mono text-[11px] text-[#09488D] underline break-all hover:text-[#073a6b]">
-                  Tx #{i + 1}: {h.slice(0, 16)}…{h.slice(-6)}
-                </a>
+                <p key={h} className="font-mono text-[11px] text-[#09488D] break-all">
+                  Hash #{i + 1}: {h}
+                </p>
               ))}
             </div>
+            <p className="text-[10px] text-slate-400 mt-1">
+              Registro de trazabilidad encadenado — cada hash liga al anterior (inmutable ante modificaciones).
+            </p>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(prestamo.blockchain_hash || "");

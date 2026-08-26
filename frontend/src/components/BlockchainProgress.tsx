@@ -11,12 +11,10 @@ interface BlockchainProgressProps {
 }
 
 function HashLink({ hash, index }: { hash: string; index: number }) {
-  const url = `https://amoy.polygonscan.com/tx/${hash}`;
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer"
-      className="font-mono text-[11px] text-[#09488D] underline break-all hover:text-[#073a6b]">
-      Tx #{index + 1}: {hash.slice(0, 18)}…{hash.slice(-6)}
-    </a>
+    <p className="font-mono text-[11px] text-[#09488D] break-all">
+      Hash #{index + 1}: {hash}
+    </p>
   );
 }
 
@@ -75,6 +73,9 @@ export default function BlockchainProgress({
             <div className="space-y-1">
               {hashes.map((h, i) => <HashLink key={h} hash={h} index={i} />)}
             </div>
+            <p className="text-[10px] text-slate-400">
+              Registro encadenado en la base de datos — cada hash liga al anterior.
+            </p>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(hashes.join(",")).then(() => {

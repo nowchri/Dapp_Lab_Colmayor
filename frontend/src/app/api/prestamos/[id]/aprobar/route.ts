@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { cookies } from "next/headers";
 import { sendConfirmacionPrestamo } from "@/lib/email";
-import {
-  computeLoanHash,
-  computeAssetHash,
-  computeStudentHash,
-  registerManyLoansOnChain,
-} from "@/lib/polygon";
+import { computeLoanHash, computeAssetHash, computeStudentHash } from "@/lib/polygon";
+import { registrarEnCadena } from "@/lib/cadena";
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
   const ck = cookies();
@@ -52,17 +48,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const studentHash = computeStudentHash(p.id_estudiante);
   const assetHashes = detalles.rows.map((d: any) => computeAssetHash(d.codigo_qr || d.id_activo));
 
-  // 2. Registrar en el contrato (1 tx por activo). Si falla, NO se aprueba.
+  // 2. Registrar en la cadena local (registro_blockchain, encadenado por hash)
   let txHashes: string[] = [];
   try {
-    const results = await registerManyLoansOnChain(loanHash, assetHashes, studentHash);
-    txHashes = results.map(r => r.txHash);
+    txHashes = await registrarEnCadena("loan", id_prestamo, loanHash, assetHashes, studentHash);
   } catch (err: any) {
-    console.error("[Polygon] Error registrando préstamo on-chain:", err?.message || err);
-    return NextResponse.json(
-      { error: "No se pudo registrar en blockchain. Reintentá o verificá la red." },
-      { status: 502 }
-    );
+    console.error("[cadena] Error registrando préstamo:", err?.message || err);
+    return NextResponse.json({ error: "No se pudo registrar la trazabilidad. Reintentá." }, { status: 502 });
   }
   const hash = txHashes.join(",");
 

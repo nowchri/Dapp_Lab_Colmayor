@@ -130,12 +130,12 @@ function BlockchainStatus() {
   useEffect(() => {
     async function load() {
       try {
-        const { getBalance, getContractInfo, getRecentEvents } = await import("@/lib/blockchain");
+        const { getBalance, getContractInfo } = await import("@/lib/blockchain");
         const addr = "0x5d0A0f056f222D3EDa3866d5977AC99B55C20baF";
         const [bal, info, evts] = await Promise.all([
           getBalance(addr),
           getContractInfo(),
-          getRecentEvents(5),
+          fetch("/api/blockchain/eventos").then(r => r.json()).catch(() => []),
         ]);
         setBalance(Number(bal).toFixed(4));
         setProfessor(String(info.professor).slice(0, 10) + "...");

@@ -14,9 +14,10 @@
  */
 
 import { ethers, JsonRpcProvider, Wallet, Contract } from "ethers";
-import { POLYGON_RPC_URL } from "@shared/constants";
 
 // --- Configuración ---
+
+const POLYGON_RPC_URL = process.env.POLYGON_RPC_URL || "";
 
 let provider: JsonRpcProvider | null = null;
 

@@ -1,0 +1,34 @@
+# Mantiene el proyecto Supabase activo (free tier pausa tras 7 días sin actividad)
+# Ping cada 2 días → nunca se llega a 7 días de inactividad.
+#
+# Configurar en GitHub → Settings → Secrets and variables → Actions:
+#   SUPABASE_URL       = https://pmfnvwkxstqhkwtjtjbt.supabase.co
+#   SUPABASE_ANON_KEY  = la "publishable key" (Settings → API de Supabase)
+name: keep-supabase-alive
+
+on:
+  schedule:
+    - cron: "0 6 */2 * *"   # cada 2 días a las 6:00 UTC
+  workflow_dispatch: {}      # permite ejecutarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping a la API de Supabase (cuenta como actividad)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            "${SUPABASE_URL}/rest/v1/areas?select=id_area&limit=1" \
+            -H "apikey: ${SUPABASE_ANON_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+          echo "Supabase respondió con código HTTP ${HTTP_CODE}"
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "206" ]; then
+            echo "::warning::Supabase respondió $HTTP_CODE — revisá si el proyecto está pausado"
+            exit 1
+          fi

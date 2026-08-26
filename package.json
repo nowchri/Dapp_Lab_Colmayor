@@ -3,7 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "DApp para gestion de prestamos del Laboratorio de Fisica y Sistemas Embebidos - IUCMC",
-  "workspaces": ["shared", "frontend", "blockchain"],
+  "workspaces": [
+    "frontend",
+    "blockchain"
+  ],
   "scripts": {
     "dev": "npm run dev --workspace=frontend",
     "build": "npm run build --workspace=frontend",
