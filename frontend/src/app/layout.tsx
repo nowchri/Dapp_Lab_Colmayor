@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import NavBar from "@/components/NavBar";
+import GuardPrimerIngreso from "@/components/GuardPrimerIngreso";
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -20,6 +21,7 @@ export default function RootLayout({
     <html lang="es" className={inter.variable}>
       <body className="min-h-screen bg-iu-light font-sans text-iu-dark antialiased">
         <NavBar />
+        <GuardPrimerIngreso />
         {children}
       </body>
     </html>

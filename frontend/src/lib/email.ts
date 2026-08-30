@@ -10,10 +10,31 @@
  *   - sendAlertaMora (RF-14, D8: solo envía correos, no bloquea)s
  */
 
+import nodemailer from "nodemailer";
+
 const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || "";
 const EMAIL_FROM = process.env.EMAIL_FROM || "cristian_santiago@unimayor.edu.co";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "cristiansantiago808@gmail.com";
-const DECANATURA_EMAIL = process.env.DECANATURA_EMAIL || "testpruea@gmail.com";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "labadministrador@gmail.com";
+const DECANATURA_EMAIL = process.env.DECANATURA_EMAIL || "labadministrador@gmail.com";
+
+// ── SMTP (Gmail) ──
+const SMTP_HOST = process.env.SMTP_HOST || "smtp.gmail.com";
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || "465", 10);
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+
+let transporter: nodemailer.Transporter | null = null;
+function getTransporter() {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+  }
+  return transporter;
+}
 
 async function sendEmail(
   to: string,
@@ -21,43 +42,35 @@ async function sendEmail(
   htmlBody: string,
   cc?: string[]
 ): Promise<boolean> {
-  if (!SENDGRID_API_KEY || SENDGRID_API_KEY.includes("your-sendgrid")) {
-    console.warn("[Email] API key no configurada. Email NO enviado:");
+  if (!SMTP_PASS || !SMTP_USER) {
+    console.warn("[Email] SMTP no configurado. Email NO enviado:");
     console.warn(`  To: ${to}, Subject: ${subject}`);
     return false;
   }
 
   try {
-    const payload = {
-      personalizations: [
-        {
-          to: [{ email: to }],
-          cc: cc?.map((email) => ({ email })) || undefined,
-        },
-      ],
-      from: { email: EMAIL_FROM, name: "Lab Fisica IUCMC" },
+    // Cualquier mensaje del sistema también llega al administrador del laboratorio
+    const copias = [...new Set([ADMIN_EMAIL, ...(cc || [])].filter(Boolean))].filter(c => c !== to);
+
+    // Pie de página: no responder; dudas van a labadministrador@gmail.com
+    const footer = `<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;line-height:1.5">
+      Este es un mensaje automático del Laboratorio de Física IUCMC.<br/>
+      Por favor no respondas a este correo. Para dudas o consultas escríbenos a
+      <a href="mailto:${ADMIN_EMAIL}" style="color:#09488D">${ADMIN_EMAIL}</a>.
+    </div>`;
+
+    await getTransporter().sendMail({
+      from: `"Lab Fisica IUCMC" <${EMAIL_FROM}>`,
+      to,
+      cc: copias.length > 0 ? copias : undefined,
+      replyTo: ADMIN_EMAIL,
       subject,
-      content: [{ type: "text/html", value: htmlBody }],
-    };
-
-    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${SENDGRID_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
+      html: htmlBody + footer,
     });
-
-    if (response.ok) {
-      console.log(`[Email] Enviado a ${to}: ${subject}`);
-      return true;
-    } else {
-      console.error(`[Email] Error ${response.status}: ${await response.text()}`);
-      return false;
-    }
-  } catch (error) {
-    console.error("[Email] Error:", error);
+    console.log(`[Email] Enviado a ${to}: ${subject}`);
+    return true;
+  } catch (error: any) {
+    console.error("[Email] Error:", error?.message || error);
     return false;
   }
 }

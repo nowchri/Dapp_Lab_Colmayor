@@ -1,6 +1,6 @@
 -- ============================================================
 -- DUMP COMPLETO para Supabase — Lab IUCMC
--- Generado: 2026-08-25T15:55:42.527Z
+-- Generado: 2026-08-27T16:15:32.153Z
 -- Pegar TODO en: Supabase → SQL Editor → New query → Run
 -- ============================================================
 
@@ -139,9 +139,15 @@ CREATE TABLE IF NOT EXISTS public.registro_blockchain (
   "prev_hash" text,
   "hash_registro" text NOT NULL,
   "fecha" timestamptz DEFAULT now(),
+  "id_estudiante" uuid,
+  "id_monitor" uuid,
+  "id_activo" uuid,
+  "monitor_hash" text,
+  "estado" text,
+  "ubicacion" text,
   PRIMARY KEY ("id_registro"),
   UNIQUE (hash_registro),
-  CHECK (((tipo)::text = ANY ((ARRAY['loan'::character varying, 'return'::character varying])::text[])))
+  CHECK (((tipo)::text = ANY (ARRAY[('loan'::character varying)::text, ('return'::character varying)::text])))
 );
 
 -- ---------- Datos: areas (2 filas) ----------
@@ -647,7 +653,6 @@ INSERT INTO public.activos ("id_activo", "codigo_qr", "nombre_activo", "id_categ
 ('597ca1b5-1332-403d-9045-8a7b9132588a', NULL, 'Carnet RFID #5', NULL, 'ea80a8a6-3f0b-44b5-91c1-c0856f071f10', 'trazable', 'disponible', NULL, NULL, 0),
 ('1b261739-e104-4ed0-abe6-bd60836a9668', 'QR-MATRIZ-DE-PANTALLA-LED-ARD-MT1W9H5Q', 'Matriz De Pantalla LED Ard #3', 'd209557e-5d22-4e1b-8bef-d49503fce24b', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('5da56f1a-d9d4-44e0-ae64-e44a284cd408', NULL, 'Carnet RFID #8', NULL, '43e9bf5f-e8fa-4629-88f5-7fd002aa6ce7', 'trazable', 'disponible', NULL, NULL, 0),
-('2ec903f8-25d5-41bf-9eab-9bb4f3f4e59e', 'QR-ADAPTADOR-ARDUINO-MT1W9GZE', 'Adaptador Arduino #1', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('beba6e9b-57d9-4684-86a2-d0ef448ace60', 'QR-MOUSE-RASPBERRY-MT1W9GTG', 'Mouse Raspberry #5', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('5d8143a8-c964-451d-b505-3710fbf15cd1', 'QR-PANTALLA-TÁCTIL-RASPBERRY-MT1W9GU8', 'Pantalla Táctil Raspberry #9', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('f96be6ce-3835-4c1e-80d3-d07489ce75ea', 'QR-REGULADOR-LM2596-DISPLAY-MT1W9H48', 'Regulador LM2596 Display #1', 'f60502f6-b90b-4d4b-8a48-31cb582404b3', NULL, 'trazable', 'disponible', NULL, NULL, 0),
@@ -678,7 +683,6 @@ INSERT INTO public.activos ("id_activo", "codigo_qr", "nombre_activo", "id_categ
 ('123033aa-895b-43a7-b8f0-43141077a081', 'QR-TARJETA-ARDUINO-MKR-WIFI-1010-MT1W9H13', 'Tarjeta Arduino MKR Wifi 1010 #1', 'b342f264-d624-45b2-8155-53ebbeeda570', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('9c40cb40-955e-4eef-ad93-191561dbdcb6', 'QR-KIT-POR-37-SENSORES-ARDUINO-MT1W9GWH', 'Kit Por 37 Sensores Arduino #24', 'f01d56b6-cde6-4ea9-96ec-03489fe43b99', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('dbb46be7-ff81-429c-a30e-bf9316f57a6b', 'QR-ADAPTADOR-ARDUINO-MT1W9GZS', 'Adaptador Arduino #11', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
-('f42b3a0c-aa7a-4503-80c3-885c6fc3552f', 'QR-ADAPTADOR-ARDUINO-MT1W9GZQ', 'Adaptador Arduino #10', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('6d700669-6536-443c-9bab-4622bf36be98', 'QR-ADAPTADOR-ARDUINO-MT1W9GZH', 'Adaptador Arduino #3', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('3d6e0222-69b9-48fb-bf1f-27b63e7d1ec5', 'QR-ADAPTADOR-ARDUINO-MT1W9GZI', 'Adaptador Arduino #4', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('65a296c9-c77a-4730-b53b-979bcbf4557d', 'QR-ADAPTADOR-ARDUINO-MT1W9GZJ', 'Adaptador Arduino #5', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
@@ -745,5 +749,7 @@ INSERT INTO public.activos ("id_activo", "codigo_qr", "nombre_activo", "id_categ
 ('dad05a9f-a77e-4116-bfa5-86204cb15df1', 'QR-TORNILLO-MICROMÉTRICO-MT1W9H91', 'Tornillo Micrométrico #3', '20a87016-b76f-4485-8859-791c0488c5e7', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('4a7bf51f-c50e-40f8-b0db-b443ccda04df', 'QR-TORNILLO-MICROMÉTRICO-MT1W9H92', 'Tornillo Micrométrico #4', '20a87016-b76f-4485-8859-791c0488c5e7', NULL, 'trazable', 'disponible', NULL, NULL, 0),
 ('8912ffd7-3aeb-42bd-87f9-62c1d0945ed5', 'QR-TORNILLO-MICROMÉTRICO-MT1W9H94', 'Tornillo Micrométrico #5', '20a87016-b76f-4485-8859-791c0488c5e7', NULL, 'trazable', 'disponible', NULL, NULL, 0),
-('912d2f03-8cd3-46d2-a059-5b34da0975bc', 'QR-TORNILLO-MICROMÉTRICO-MT1W9H95', 'Tornillo Micrométrico #6', '20a87016-b76f-4485-8859-791c0488c5e7', NULL, 'trazable', 'disponible', NULL, NULL, 0);
+('912d2f03-8cd3-46d2-a059-5b34da0975bc', 'QR-TORNILLO-MICROMÉTRICO-MT1W9H95', 'Tornillo Micrométrico #6', '20a87016-b76f-4485-8859-791c0488c5e7', NULL, 'trazable', 'disponible', NULL, NULL, 0),
+('2ec903f8-25d5-41bf-9eab-9bb4f3f4e59e', 'QR-ADAPTADOR-ARDUINO-MT1W9GZE', 'Adaptador Arduino #1', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'disponible', NULL, NULL, 0),
+('f42b3a0c-aa7a-4503-80c3-885c6fc3552f', 'QR-ADAPTADOR-ARDUINO-MT1W9GZQ', 'Adaptador Arduino #10', 'c767072d-58bf-4f21-8bf7-04713ef0d1c1', NULL, 'trazable', 'mantenimiento', NULL, NULL, 0);
 

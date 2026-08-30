@@ -26,19 +26,49 @@ export default function PrestamoDocentePage() {
   const [materia, setMateria] = useState("");
   const [profesor, setProfesor] = useState("");
   const [cursoGrupo, setCursoGrupo] = useState("");
-  const [diasPrestamo, setDiasPrestamo] = useState(8);
+  const [fechaLimite, setFechaLimite] = useState(() => {
+    const d = new Date(Date.now() + 8 * 86400000);
+    return d.toISOString().split("T")[0];
+  });
 
   useEffect(() => {
     Promise.all([
       fetch("/api/inventario").then(r => r.json()),
       fetch("/api/areas").then(r => r.json()),
     ]).then(([inv, areasData]) => {
-      // Filter: only disponibles, no id_activo_padre (not children)
-      setCatalogo(inv.filter((a: Activo) => a.estado === "disponible" && !a.id_activo_padre));
+      // Filter: only disponibles/incompleto, no id_activo_padre (not children)
+      const disponibles = inv.filter((a: Activo) => (a.estado === "disponible" || a.estado === "incompleto") && !a.id_activo_padre);
+      setCatalogo(disponibles);
       setAreas(areasData);
+
+      // Cargar escaneos previos (FabScanner de inventario) — SOLO con catálogo listo
+      try {
+        const stored = localStorage.getItem("scannedBag");
+        if (stored) {
+          const codes = JSON.parse(stored) as string[];
+          if (codes.length > 0) {
+            const agregados: string[] = [];
+            disponibles.forEach((a: Activo) => {
+              const cqr = (a.codigo_qr || "").toLowerCase().trim();
+              const match = codes.find(c => {
+                const sc = c.toLowerCase().trim();
+                return cqr === sc || a.id_activo === sc;
+              });
+              if (match && !agregados.includes(a.id_activo)) {
+                agregados.push(a.id_activo);
+                setCarrito(prevC => prevC.find(p => p.activo.id_activo === a.id_activo) ? prevC : [...prevC, { activo: a, cantidad: 1 }]);
+              }
+            });
+            localStorage.removeItem("scannedBag");
+            if (agregados.length > 0) {
+              toast.success(`Escaneados: ${agregados.length} activos en la bolsa`);
+            }
+          }
+        }
+      } catch {}
     }).catch(() => toast.error("Error al cargar")).finally(() => setLoading(false));
 
-    // Listen for scanned items from FAB
+    // Escaneo en vivo mientras se está en esta página
     const handleScan = () => {
       const stored = localStorage.getItem("scannedBag");
       if (!stored) return;
@@ -50,7 +80,7 @@ export default function PrestamoDocentePage() {
           const sc = code.toLowerCase().trim();
           const match = prev.find(c => {
             const cqr = (c.codigo_qr || "").toLowerCase().trim();
-            return cqr === sc || c.id_activo === sc || cqr.includes(sc) || sc.includes(cqr);
+            return cqr === sc || c.id_activo === sc;
           });
           if (match) {
             setCarrito(prevC => {
@@ -63,7 +93,6 @@ export default function PrestamoDocentePage() {
       });
     };
     window.addEventListener("scannedItemsChanged", handleScan);
-    handleScan(); // check on mount
     return () => window.removeEventListener("scannedItemsChanged", handleScan);
   }, []);
 
@@ -72,7 +101,7 @@ export default function PrestamoDocentePage() {
     setCatalogo(prev => {
       const found = prev.find(c => {
         const cqr = (c.codigo_qr || "").toLowerCase().trim();
-        return cqr === sc || c.id_activo === sc || cqr.includes(sc) || sc.includes(cqr);
+        return cqr === sc || c.id_activo === sc;
       });
       if (found) {
         setCarrito(prevC => {
@@ -103,7 +132,7 @@ export default function PrestamoDocentePage() {
           materia: materia || null,
           profesor_encargado: profesor || null,
           curso_grupo: cursoGrupo || null,
-          dias_prestamo: diasPrestamo,
+          fecha_limite: fechaLimite,
           items: carrito.map(c => ({ id_activo: c.activo.id_activo, cantidad: c.cantidad })),
         }),
       });
@@ -167,11 +196,9 @@ export default function PrestamoDocentePage() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Días de préstamo</label>
-                <select value={diasPrestamo} onChange={e => setDiasPrestamo(Number(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none text-sm">
-                  {[1,2,3,4,5,6,7,8,10,14,15,21,30].map(d => <option key={d} value={d}>{d} días</option>)}
-                </select>
+                <label className="block text-xs font-medium text-slate-600 mb-1">Fecha límite de devolución *</label>
+                <input type="date" value={fechaLimite} onChange={e => setFechaLimite(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl outline-none text-sm" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Materia / Proyecto *</label>

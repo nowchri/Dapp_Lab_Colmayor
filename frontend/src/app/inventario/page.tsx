@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import FabScanner from "@/components/FabScanner";
+import QRScanner from "@/components/QRScanner";
 
 interface Activo {
   id_activo: string; nombre_activo: string; codigo_qr: string | null;
@@ -69,12 +70,13 @@ function KitChildren({ parentId, parentName }: { parentId: string; parentName: s
   );
 }
 
-function Modal({ activo, rol, onClose, onAgregarBolsa, onSolicitarYa, enCarrito, onChangeEstado, onChangeStock, categorias }: {
+function Modal({ activo, rol, onClose, onAgregarBolsa, onSolicitarYa, enCarrito, onChangeEstado, onChangeStock, onChangeObs, categorias }: {
   activo: Activo | null; rol: string; onClose: () => void;
   onAgregarBolsa: (a: Activo) => void; onSolicitarYa: (a: Activo) => void; enCarrito: boolean;
-  onChangeEstado: (id: string, estado: string) => void; onChangeStock: (id: string, stock: number) => void; categorias: any[];
+  onChangeEstado: (id: string, estado: string) => void; onChangeStock: (id: string, stock: number) => void; onChangeObs: (id: string, obs: string) => void; categorias: any[];
 }) {
   const [stockInput, setStockInput] = useState(activo?.stock_actual ?? 0);
+  const [obsInput, setObsInput] = useState((activo as any)?.observaciones_iniciales ?? "");
   if (!activo) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
@@ -137,6 +139,23 @@ function Modal({ activo, rol, onClose, onAgregarBolsa, onSolicitarYa, enCarrito,
               </div>
             )}
             <div>
+              <p className="text-xs text-slate-400 mb-1">📝 Observaciones:</p>
+              <textarea
+                value={obsInput}
+                onChange={e => setObsInput(e.target.value)}
+                rows={2}
+                placeholder="Ej: Falta cable USB, requiere calibración..."
+                className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white outline-none focus:ring-1 focus:ring-[#09488D] resize-none"
+              />
+              <button
+                onClick={() => onChangeObs(activo.id_activo, obsInput)}
+                disabled={obsInput === ((activo as any).observaciones_iniciales || "")}
+                className="mt-1.5 text-xs bg-[#09488D] text-white px-3 py-1.5 rounded-lg hover:bg-[#073a6b] transition disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Guardar observaciones
+              </button>
+            </div>
+            <div>
               <p className="text-xs text-slate-400 mb-1">Categoria:</p>
               <select
                 value={(activo as any).id_categoria || ""}
@@ -156,10 +175,10 @@ function Modal({ activo, rol, onClose, onAgregarBolsa, onSolicitarYa, enCarrito,
             <div>
               <p className="text-xs text-slate-400 mb-1">Cambiar estado:</p>
               <div className="flex gap-1.5 flex-wrap">
-                {["disponible","dañado","mantenimiento"].map(e => e === activo.estado ? null : (
+                {["disponible","dañado","mantenimiento","incompleto"].map(e => e === activo.estado ? null : (
                   <button key={e} onClick={() => onChangeEstado(activo.id_activo, e)}
-                    className={`text-xs px-3 py-1.5 rounded-lg border transition ${e === "disponible" ? "border-emerald-300 text-emerald-600 hover:bg-emerald-50" : e === "dañado" ? "border-rose-300 text-rose-600 hover:bg-rose-50" : "border-amber-300 text-amber-600 hover:bg-amber-50"}`}>
-                    {e.charAt(0).toUpperCase() + e.slice(1)}
+                    className={`text-xs px-3 py-1.5 rounded-lg border transition ${e === "disponible" ? "border-emerald-300 text-emerald-600 hover:bg-emerald-50" : e === "dañado" ? "border-rose-300 text-rose-600 hover:bg-rose-50" : e === "mantenimiento" ? "border-amber-300 text-amber-600 hover:bg-amber-50" : "border-amber-400 border-dashed text-amber-700 hover:bg-amber-50"}`}>
+                    {e === "incompleto" ? " Incompleto" : e.charAt(0).toUpperCase() + e.slice(1)}
                   </button>
                 ))}
               </div>
@@ -167,7 +186,7 @@ function Modal({ activo, rol, onClose, onAgregarBolsa, onSolicitarYa, enCarrito,
           </div>
         )}
 
-        {rol === "estudiante" && activo.estado === "disponible" && (
+        {rol === "estudiante" && (activo.estado === "disponible" || activo.estado === "incompleto") && (
           <div className="flex gap-2 pt-2">
             <button onClick={() => onAgregarBolsa(activo)} className={`flex-1 py-2 rounded-xl text-sm font-medium transition ${enCarrito ? "bg-red-50 text-red-600 border border-red-200" : "btn-outline"}`}>{enCarrito ? "Quitar" : "Agregar a bolsa"}</button>
             <button onClick={() => onSolicitarYa(activo)} className="flex-1 btn-primary text-sm">Solicitar ya</button>
@@ -176,6 +195,105 @@ function Modal({ activo, rol, onClose, onAgregarBolsa, onSolicitarYa, enCarrito,
         <button onClick={onClose} className="btn-ghost w-full text-sm">Cerrar</button>
       </div>
     </div>
+  );
+}
+
+function ComprobarModal({ activos, onClose }: { activos: Activo[]; onClose: () => void }) {
+  const [codigo, setCodigo] = useState("");
+  const [resultado, setResultado] = useState<Activo | null>(null);
+  const [buscando, setBuscando] = useState(false);
+  const [scanning, setScanning] = useState(false);
+
+  function buscar(code: string) {
+    const sc = (code || "").toLowerCase().trim();
+    if (!sc) return;
+    setBuscando(true);
+    const match = activos.find(a => {
+      const cqr = (a.codigo_qr || "").toLowerCase().trim();
+      return cqr === sc || a.id_activo === sc;
+    });
+    setResultado(match || null);
+    setBuscando(false);
+  }
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
+        <div className="bg-white/95 rounded-[14px] p-6 max-w-md w-full m-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white space-y-4" onClick={e => e.stopPropagation()}>
+          <div className="flex items-start justify-between">
+            <h2 className="text-xl font-bold text-[#09488D]">✅ Comprobar activo</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+          </div>
+          <p className="text-xs text-slate-400 -mt-2">Escribí el código del activo que tenés en la mano, o escanealo con la cámara.</p>
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={codigo}
+              onChange={e => setCodigo(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") buscar(codigo); }}
+              placeholder="Código QR o ID del activo..."
+              className="input-glass flex-1 text-sm"
+              autoFocus
+            />
+            <button onClick={() => buscar(codigo)} disabled={buscando} className="btn-primary text-xs shrink-0">
+              {buscando ? "..." : "Buscar"}
+            </button>
+          </div>
+          <button onClick={() => setScanning(true)} className="btn-outline w-full text-sm">
+            📷 Escanear con cámara
+          </button>
+
+          {resultado !== null && (
+            <div className={`rounded-xl p-4 ${resultado.estado === "disponible" ? "bg-emerald-50 border border-emerald-200" : resultado.estado === "prestado" ? "bg-blue-50 border border-blue-200" : resultado.estado === "dañado" ? "bg-rose-50 border border-rose-200" : "bg-amber-50 border border-amber-200"}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-bold text-slate-800">{resultado.nombre_activo}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{resultado.nombre_area || ""}{resultado.nombre_categoria ? " · " + resultado.nombre_categoria : ""}</p>
+                </div>
+                <span className={`shrink-0 text-xs px-2.5 py-1 rounded-full font-medium ${
+                  resultado.estado === "disponible" ? "bg-emerald-600 text-white" :
+                  resultado.estado === "prestado" ? "bg-blue-600 text-white" :
+                  resultado.estado === "dañado" ? "bg-rose-600 text-white" :
+                  "bg-amber-500 text-white"
+                }`}>
+                  {resultado.estado === "incompleto" ? "incompleto" : resultado.estado}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className="px-2 py-0.5 rounded-full bg-white text-slate-600">{resultado.tipo === "trazable" ? "Trazable" : "Consumible"}</span>
+                {resultado.tipo === "consumible" && (
+                  <span className={`px-2 py-0.5 rounded-full ${(resultado.stock_actual ?? 0) > 0 ? "bg-white text-emerald-700" : "bg-white text-rose-600"}`}>
+                    📦 Stock: {resultado.stock_actual ?? 0}
+                  </span>
+                )}
+                {resultado.componentes > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-white text-amber-700">🧩 {resultado.componentes} componentes</span>
+                )}
+              </div>
+              {(resultado as any).observaciones_iniciales && (
+                <p className="mt-2 text-xs text-slate-600 bg-white/70 rounded-lg px-3 py-2 whitespace-pre-line">
+                  📝 {(resultado as any).observaciones_iniciales}
+                </p>
+              )}
+            </div>
+          )}
+
+          {resultado === null && codigo !== "" && !buscando && (
+            <p className="text-xs text-rose-500 text-center">No se encontró ningún activo con ese código.</p>
+          )}
+        </div>
+      </div>
+
+      {scanning && (
+        <QRScanner
+          onScan={code => { setScanning(false); setCodigo(code); buscar(code); }}
+          bagCount={0}
+          onClose={() => setScanning(false)}
+          showBagLink={false}
+        />
+      )}
+    </>
   );
 }
 
@@ -189,6 +307,7 @@ export default function InventarioPage() {
   const [carrito, setCarrito] = useState<Activo[]>([]);
   const [filtroArea, setFiltroArea] = useState("todas");
   const [areasList, setAreasList] = useState<any[]>([]);
+  const [showComprobar, setShowComprobar] = useState(false);
 
     const areasUnicas = [...new Set(activos.map(a => a.nombre_area).filter(Boolean))] as string[];
 
@@ -198,6 +317,34 @@ export default function InventarioPage() {
     fetch("/api/areas").then(r => r.json()).then(setAreasList).catch(() => {});
     const c = document.cookie.split("; ").find(r => r.startsWith("userRol="));
     if (c) setRol(c.split("=")[1]);
+
+    // Escaneos del FAB: reflejarlos en la bolsa visible SIN consumir scannedBag
+    // (scannedBag acumula todos los escaneos; lo consume la página de préstamo)
+    const handleScan = () => {
+      setActivos(prev => {
+        const stored = localStorage.getItem("scannedBag");
+        if (!stored) return prev;
+        const codes = JSON.parse(stored) as string[];
+        if (codes.length === 0) return prev;
+        codes.forEach(code => {
+          const sc = code.toLowerCase().trim();
+          const match = prev.find(a => {
+            const cqr = (a.codigo_qr || "").toLowerCase().trim();
+            return cqr === sc || a.id_activo === sc;
+          });
+          if (match) {
+            setCarrito(prevC => {
+              if (prevC.find(p => p.id_activo === match.id_activo)) return prevC;
+              toast.success(match.nombre_activo + " escaneado a la bolsa");
+              return [...prevC, match];
+            });
+          }
+        });
+        return prev;
+      });
+    };
+    window.addEventListener("scannedItemsChanged", handleScan);
+    return () => window.removeEventListener("scannedItemsChanged", handleScan);
   }, []);
 
   async function cambiarEstado(id: string, nuevoEstado: string) {
@@ -207,6 +354,17 @@ export default function InventarioPage() {
         setActivos(prev => prev.map(a => a.id_activo === id ? { ...a, estado: nuevoEstado } : a));
         setModal(prev => prev && prev.id_activo === id ? { ...prev, estado: nuevoEstado } : prev);
         toast.success("Estado actualizado");
+      } else { const e = await res.json(); toast.error(e.error || "Error"); }
+    } catch { toast.error("Error de conexion"); }
+  }
+
+  async function cambiarObservaciones(id: string, obs: string) {
+    try {
+      const res = await fetch(`/api/inventario/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ observaciones_iniciales: obs }) });
+      if (res.ok) {
+        setActivos(prev => prev.map(a => a.id_activo === id ? { ...a, observaciones_iniciales: obs || null } : a));
+        setModal(prev => prev && prev.id_activo === id ? { ...prev, observaciones_iniciales: obs || null } : prev);
+        toast.success("Observaciones actualizadas");
       } else { const e = await res.json(); toast.error(e.error || "Error"); }
     } catch { toast.error("Error de conexion"); }
   }
@@ -241,6 +399,13 @@ export default function InventarioPage() {
           <div className="flex items-center gap-3 mb-4">
             <h1 className="text-xl md:text-2xl font-bold text-[#09488D]">Inventario</h1>
             <span className="pill-primary">{activos.length} activos</span>
+            <button
+              onClick={() => setShowComprobar(true)}
+              className="ml-auto md:ml-0 text-xs font-medium bg-[#E8BD02] text-white px-3.5 py-1.5 rounded-lg hover:bg-[#073a6b] transition"
+              title="Escaneá el QR del activo que tenés en la mano para comprobar su estado"
+            >
+              Comprobar activo
+            </button>
           </div>
           {/* Search bar — full width on mobile */}
           <div className="mb-3">
@@ -304,7 +469,7 @@ export default function InventarioPage() {
                   a.estado === "dañado" ? "bg-white/30 text-white" :
                   a.estado === "mantenimiento" ? "bg-amber-100 text-amber-800" :
                   "bg-amber-200 text-amber-800"
-                }`}>{a.estado === "incompleto" ? "⚠️ incompleto" : a.estado}</span>
+                }`}>{a.estado === "incompleto" ? "incompleto" : a.estado}</span>
 
                 {a.componentes > 0 && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full ml-auto">🧩 {a.componentes}</span>}
               </div>
@@ -318,9 +483,10 @@ export default function InventarioPage() {
         <Modal key={modal?.id_activo || "cerrado"} activo={modal} rol={rol} onClose={() => setModal(null)}
           onAgregarBolsa={agregarAlCarrito} onSolicitarYa={solicitarYa}
           enCarrito={!!modal && carrito.some(c => c.id_activo === modal.id_activo)}
-          onChangeEstado={cambiarEstado} onChangeStock={cambiarStock} categorias={categorias} />
+          onChangeEstado={cambiarEstado} onChangeStock={cambiarStock} onChangeObs={cambiarObservaciones} categorias={categorias} />
       </div>
       <FabScanner />
+      {showComprobar && <ComprobarModal activos={activos} onClose={() => { setShowComprobar(false); setModal(null); }} />}
     </div>
   );
 }

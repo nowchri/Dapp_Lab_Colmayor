@@ -38,47 +38,81 @@ function NuevoPrestamoContent() {
   const [enviando, setEnviando] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
+  // Carga del catálogo + procesamiento de items entrantes (query param y escaneos)
   useEffect(() => {
-    fetch("/api/inventario").then(r => r.json()).then(d => setCatalogo(d.filter((a: Activo) => a.estado === "disponible"))).catch(() => {});
+    fetch("/api/inventario").then(r => r.json()).then((d: Activo[]) => {
+      const disponibles = d.filter((a: Activo) => (a.estado === "disponible" || a.estado === "incompleto"));
+      setCatalogo(disponibles);
 
-    // Load scanned items from localStorage (from FabScanner in other pages)
-    const stored = localStorage.getItem("scannedBag");
-    if (stored) {
-      const ids: string[] = JSON.parse(stored);
-      if (ids.length > 0) {
-        const timer = setTimeout(() => {
-          setCatalogo(prev => {
-            prev.forEach(a => {
-              if (ids.includes(a.id_activo) || ids.includes(a.codigo_qr || "")) {
-                setCarrito(prevC => {
-                  if (prevC.find(c => c.activo.id_activo === a.id_activo)) return prevC;
-                  return [...prevC, { activo: a, cantidad: 1 }];
-                });
+      const agregar = (a: Activo) => {
+        setCarrito(prevC => prevC.find(p => p.activo.id_activo === a.id_activo) ? prevC : [...prevC, { activo: a, cantidad: 1 }]);
+      };
+
+      // 1) Items del query param (?items=... de "Ir a solicitar" en inventario)
+      const ids = sp?.get("items");
+      const idArr = ids ? ids.split(",") : [];
+      if (idArr.length > 0) {
+        (async () => {
+          const nuevos: Activo[] = [];
+          for (const m of disponibles) {
+            if (!idArr.includes(m.id_activo)) continue;
+            nuevos.push(m);
+            // Hijos de kits trazables
+            if (m.tipo === "trazable") {
+              try {
+                const res = await fetch(`/api/inventario/${m.id_activo}/children`);
+                if (res.ok) {
+                  const children = await res.json();
+                  for (const ch of children) nuevos.push(ch);
+                }
+              } catch {}
+            }
+          }
+          nuevos.forEach(agregar);
+        })();
+      }
+
+      // 2) Escaneos acumulados (FabScanner) — matcheo EXACTO y SIEMPRE se consumen
+      try {
+        const stored = localStorage.getItem("scannedBag");
+        if (stored) {
+          const codes: string[] = JSON.parse(stored);
+          const agregados: string[] = [];
+          if (codes.length > 0) {
+            disponibles.forEach(a => {
+              const sc = (a.codigo_qr || "").toLowerCase().trim();
+              const match = codes.find(c => {
+                const cc = c.toLowerCase().trim();
+                return sc === cc || a.id_activo === cc;
+              });
+              if (match && !agregados.includes(a.id_activo)) {
+                agregados.push(a.id_activo);
+                agregar(a);
               }
             });
-            return prev;
-          });
+          }
           localStorage.removeItem("scannedBag");
-          toast.success("Items cargados desde escaneos anteriores");
-        }, 600);
-      }
-    }
+          if (agregados.length > 0) {
+            toast.success(`Escaneados: ${agregados.length} activos en la bolsa`);
+          }
+        }
+      } catch {}
+    }).catch(() => {});
   }, []);
 
-  // Listen for live scan events from FabScanner
+  // Escaneo en vivo mientras se está en esta página
   useEffect(() => {
     function handleScan() {
       var stored = localStorage.getItem("scannedBag");
       if (!stored) return;
       var codes: string[] = JSON.parse(stored);
       if (codes.length === 0) return;
-      localStorage.removeItem("scannedBag");
       codes.forEach(function(code) {
         var sc = code.toLowerCase().trim();
         setCatalogo(function(prev) {
           var found = prev.find(function(c) {
             var cqr = ((c as any).codigo_qr || "").toLowerCase().trim();
-            return cqr === sc || c.id_activo === sc || cqr.indexOf(sc) >= 0 || sc.indexOf(cqr) >= 0;
+            return cqr === sc || c.id_activo === sc;
           });
           if (found) {
             var fobj = found;
@@ -93,43 +127,11 @@ function NuevoPrestamoContent() {
           return prev;
         });
       });
+      localStorage.removeItem("scannedBag");
     }
     window.addEventListener("scannedItemsChanged", handleScan);
-    handleScan();
     return function() { window.removeEventListener("scannedItemsChanged", handleScan); };
   }, []);
-
-  useEffect(() => {
-    const ids = sp?.get("items");
-    if (ids) {
-      const idArr = ids.split(",");
-      const t = setTimeout(async () => {
-        const matched = catalogo.filter(a => idArr.includes(a.id_activo));
-        const allItems: { activo: Activo; cantidad: number }[] = [];
-        for (const m of matched) {
-          if (!carrito.find(p => p.activo.id_activo === m.id_activo)) {
-            allItems.push({ activo: m, cantidad: 1 });
-          }
-          // Fetch children for kits
-          if (m.tipo === "trazable") {
-            try {
-              const res = await fetch(`/api/inventario/${m.id_activo}/children`);
-              if (res.ok) {
-                const children = await res.json();
-                for (const ch of children) {
-                  if (!carrito.find(p => p.activo.id_activo === ch.id_activo) && !allItems.find(p => p.activo.id_activo === ch.id_activo)) {
-                    allItems.push({ activo: ch, cantidad: 1 });
-                  }
-                }
-              }
-            } catch {}
-          }
-        }
-        if (allItems.length) setCarrito(prev => [...prev, ...allItems]);
-      }, 600);
-      return () => clearTimeout(t);
-    }
-  }, [sp, catalogo]);
 
   const onScan = useCallback((code: string) => {
     const sc = code.toLowerCase().trim();
@@ -137,7 +139,7 @@ function NuevoPrestamoContent() {
     setCatalogo(prev => {
       const found = prev.find(c => {
         const cqr = (c.codigo_qr || "").toLowerCase().trim();
-        return cqr === sc || c.id_activo === sc || cqr.includes(sc) || sc.includes(cqr);
+        return cqr === sc || c.id_activo === sc;
       });
       if (found) {
         setCarrito(prevC => {

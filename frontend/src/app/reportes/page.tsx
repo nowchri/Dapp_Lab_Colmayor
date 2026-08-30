@@ -3,14 +3,15 @@
 import { useEffect, useState } from "react";
 
 interface Stats {
-  total_activos: number; disponibles: number; prestados: number; danados: number;
+  total_activos: number; disponibles: number; prestados: number; danados: number; mantenimiento: number;
   prestamos_activos: number; devueltos: number; en_mora: number;
   total_trazables: number; total_consumibles: number;
   trazables_prestados: number; consumibles_prestados: number;
 }
 
 function DonutRing({ value, total, color, label, sublabel }: { value: number; total: number; color: string; label: string; sublabel: string }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  const pct = total > 0 ? (value / total) * 100 : 0;
+  const pctStr = pct >= 10 ? pct.toFixed(0) : pct.toFixed(1);
   const circumference = 2 * Math.PI * 38;
   const offset = circumference - (pct / 100) * circumference;
   return (
@@ -21,7 +22,7 @@ function DonutRing({ value, total, color, label, sublabel }: { value: number; to
           <circle cx="50" cy="50" r="38" fill="none" stroke={color} strokeWidth="10" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-xl font-bold" style={{ color }}>{pct}%</span>
+          <span className="text-xl font-bold" style={{ color }}>{pctStr}%</span>
         </div>
       </div>
       <p className="text-sm font-semibold text-slate-700 mt-2">{label}</p>
@@ -31,12 +32,13 @@ function DonutRing({ value, total, color, label, sublabel }: { value: number; to
 }
 
 function ProgressBar({ value, total, color, label }: { value: number; total: number; color: string; label: string }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  const pct = total > 0 ? (value / total) * 100 : 0;
+  const pctStr = pct >= 10 ? pct.toFixed(0) : pct.toFixed(1);
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
         <span className="text-slate-600">{label}</span>
-        <span className="text-slate-400">{value}/{total}</span>
+        <span className="text-slate-400">{value}/{total} · {pctStr}%</span>
       </div>
       <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
@@ -93,7 +95,7 @@ export default function ReportesPage() {
   const prestados = stats.prestados || 0;
   const danados = stats.danados || 0;
   const disponibles = stats.disponibles || 0;
-  const mantenimiento = total - disponibles - prestados - danados;
+  const mantenimiento = stats.mantenimiento || 0;
   const enMora = stats.en_mora || 0;
   const devueltos = stats.devueltos || 0;
 
