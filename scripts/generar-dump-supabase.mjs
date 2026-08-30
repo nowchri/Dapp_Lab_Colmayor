@@ -7,10 +7,13 @@ import pg from "pg";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const envText = readFileSync(join(__dirname, "..", "frontend", ".env"), "utf8");
-const m = envText.match(/DATABASE_URL=(.+)/);
+// Línea ACTIVA (ignorar comentadas)
+const lineas = envText.split("\n").filter(l => l.startsWith("DATABASE_URL="));
+const m = lineas.length > 0 ? lineas[lineas.length - 1].match(/DATABASE_URL=(.+)/) : null;
 if (!m) { console.error("No se encontró DATABASE_URL"); process.exit(1); }
+const DB_URL = m[1].trim();
 
-const client = new pg.Client({ connectionString: m[1].trim() });
+const client = new pg.Client({ connectionString: DB_URL, ssl: DB_URL.includes("supabase.co") ? { rejectUnauthorized: false } : undefined });
 await client.connect();
 
 const TABLES = ["areas", "categorias", "configuracion", "perfiles", "activos", "prestamos", "detalles_prestamo", "registro_blockchain"];
