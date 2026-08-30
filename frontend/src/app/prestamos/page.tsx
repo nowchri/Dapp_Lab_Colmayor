@@ -18,11 +18,41 @@ interface DetallesPopupProps {
 
 function DetallesPopup({ prestamo, onClose }: DetallesPopupProps) {
   const [detalles, setDetalles] = useState<any[]>([]);
+  const [rol, setRol] = useState("");
 
   useEffect(() => {
     fetch(`/api/prestamos/${prestamo.id_prestamo}/detalles`)
       .then(r => r.json()).then(setDetalles).catch(() => {});
+    const c = document.cookie.split("; ").find(r => r.startsWith("userRol="));
+    if (c) setRol(c.split("=")[1]);
   }, [prestamo.id_prestamo]);
+
+  // ── Recordatorio (WhatsApp / Correo) ──
+  const esRecordable = prestamo.estado_general === "activo" || prestamo.estado_general === "mora";
+  const puedeRecordar = rol === "monitor" || rol === "admin";
+
+  function armarMensaje(): string {
+    const limite = new Date(prestamo.fecha_limite).toLocaleDateString("es-CO");
+    const items = detalles
+      .filter((d: any) => !d.esta_devuelto)
+      .map((d: any) => `• ${d.nombre_activo || d.activo_nombre} (x${d.cantidad_entregada})`)
+      .join("\n");
+    return `Hola ${prestamo.estudiante_nombre}, 👋\n\nTe recordamos que tienes pendiente la devolución del préstamo${prestamo.materia ? ` de ${prestamo.materia}` : ""} al Laboratorio IUCMC.\n\n📦 Artículos:\n${items || "• (sin artículos pendientes)"}\n\n📅 Fecha límite: ${limite}\n\nPor favor acércate al laboratorio para devolverlos. ¡Gracias!`;
+  }
+
+  function whatsappUrl(): string | null {
+    const tel = detalles[0]?.estudiante_telefono;
+    if (!tel) return null;
+    const solo = (tel as string).replace(/\D/g, "");
+    const intl = solo.startsWith("57") ? solo : `57${solo}`;
+    return `https://wa.me/${intl}?text=${encodeURIComponent(armarMensaje())}`;
+  }
+
+  function mailtoUrl(): string | null {
+    const correo = detalles[0]?.estudiante_correo;
+    if (!correo) return null;
+    return `mailto:${correo}?subject=${encodeURIComponent("Devolución de préstamo — Laboratorio IUCMC")}&body=${encodeURIComponent(armarMensaje())}`;
+  }
 
   const inicio = new Date(prestamo.fecha_inicio);
   const limite = new Date(prestamo.fecha_limite);
@@ -97,6 +127,34 @@ function DetallesPopup({ prestamo, onClose }: DetallesPopupProps) {
             </div>
           )}
         </div>
+
+        {esRecordable && puedeRecordar && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-2">
+            <p className="text-xs font-semibold text-amber-700">🔔 Recordar devolución al estudiante</p>
+            {detalles.length > 0 ? (
+              <div className="flex gap-2">
+                <a
+                  href={whatsappUrl() || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => { if (!whatsappUrl()) { e.preventDefault(); toast.error("El estudiante no tiene teléfono registrado"); } }}
+                  className="flex-1 text-center text-xs font-medium bg-[#25D366] text-white px-3 py-2 rounded-lg hover:opacity-90 transition"
+                >
+                  💬 WhatsApp
+                </a>
+                <a
+                  href={mailtoUrl() || "#"}
+                  onClick={e => { if (!mailtoUrl()) { e.preventDefault(); toast.error("El estudiante no tiene correo registrado"); } }}
+                  className="flex-1 text-center text-xs font-medium bg-[#09488D] text-white px-3 py-2 rounded-lg hover:bg-[#073a6b] transition"
+                >
+                  ✉️ Correo
+                </a>
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400">Cargando datos del estudiante...</p>
+            )}
+          </div>
+        )}
 
         <button onClick={onClose} className="btn-ghost w-full text-sm">Cerrar</button>
       </div>

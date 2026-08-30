@@ -221,8 +221,8 @@ function HorarioMonitor({ rol }: { rol: string }) {
 
   if (editing) {
     return (
-      <div className="card-glass">
-        <h3 className="font-bold text-[#09488D] mb-2">Editar horario de atención</h3>
+      <div className="rounded-[14px] bg-rose-50 border-2 border-rose-200 p-4 shadow-sm">
+        <h3 className="font-bold text-rose-600 mb-2">Editar horario de atención</h3>
         <textarea value={texto} onChange={e => setTexto(e.target.value)} className="input-glass h-24 resize-none text-sm"
           placeholder="Ej: Lunes a Viernes 8am-12pm y 2pm-6pm. Sábados 9am-12pm." />
         <div className="flex gap-2 mt-2">
@@ -289,6 +289,7 @@ export default function DashboardPage() {
 
       {/* Cards grid — constrained width */}
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-8">
+        <HorarioMonitor rol={user.rol} />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {user.rol === "estudiante" && (
             <>
@@ -313,8 +314,6 @@ export default function DashboardPage() {
             </>
           )}
         </div>
-
-        <HorarioMonitor rol={user.rol} />
 
         {user.rol === "admin" && <BlockchainStatus />}
       </main>

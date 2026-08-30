@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/auth";
 
 // GET — obtener perfil + stats del usuario logueado
 export async function GET() {
-  const ck = cookies();
-  const uid = ck.get("userId")?.value;
-  if (!uid) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const usuario = await getSessionUser();
+  if (!usuario) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const uid = usuario.id_perfil;
 
   const pool = getPool();
 
@@ -34,9 +34,9 @@ export async function GET() {
 
 // PUT — actualizar campos no criticos
 export async function PUT(request: NextRequest) {
-  const ck = cookies();
-  const uid = ck.get("userId")?.value;
-  if (!uid) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const usuario = await getSessionUser();
+  if (!usuario) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const uid = usuario.id_perfil;
 
   try {
     const body = await request.json();

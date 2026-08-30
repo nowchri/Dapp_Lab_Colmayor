@@ -1,10 +1,13 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import PasswordInput from "@/components/PasswordInput";
 
 export default function LoginPage() {
   const router = useRouter();
   const [correo, setCorreo] = useState("");
+  const [password, setPassword] = useState("");
+  const [requierePassword, setRequierePassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorTxt, setErrorTxt] = useState("");
 
@@ -18,13 +21,25 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ correo: correo.trim().toLowerCase() }),
+        body: JSON.stringify({ correo: correo.trim().toLowerCase(), password: password || undefined }),
       });
 
       const data = await res.json();
 
       if (!res.ok) {
-        setErrorTxt(data.error || "Error al iniciar sesion");
+        // Admin/monitor sin contraseña enviada → pedirla
+        if (data.requiere_password) {
+          setRequierePassword(true);
+          setErrorTxt("");
+        } else {
+          setErrorTxt(data.error || "Error al iniciar sesion");
+        }
+        return;
+      }
+
+      // Primer ingreso de admin/monitor → crear contraseña
+      if (data.primer_ingreso) {
+        router.push("/primer-ingreso");
         return;
       }
 
@@ -35,6 +50,12 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function volverAlCorreo() {
+    setRequierePassword(false);
+    setPassword("");
+    setErrorTxt("");
   }
 
   return (
@@ -65,12 +86,29 @@ export default function LoginPage() {
               />
             </div>
 
+            {requierePassword ? (
+              <div className="animate-fade-in">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-sm font-medium text-iu-dark">Contraseña</label>
+                  <button type="button" onClick={volverAlCorreo} className="text-xs text-iu-primary hover:underline">
+                    ← Cambiar correo
+                  </button>
+                </div>
+                <PasswordInput value={password} onChange={setPassword} disabled={loading} autoFocus />
+                <p className="text-[11px] text-amber-600 mt-1.5">🔒 Esta cuenta (admin/monitor) requiere contraseña.</p>
+              </div>
+            ) : (
+              <p className="text-xs text-iu-gray">
+                
+              </p>
+            )}
+
             {errorTxt && (
               <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{errorTxt}</p>
             )}
 
-            <button type="submit" disabled={loading || !correo.trim()} className="btn-primary w-full py-3 text-lg">
-              {loading ? "Verificando..." : "Ingresar"}
+            <button type="submit" disabled={loading || !correo.trim() || (requierePassword && !password)} className="btn-primary w-full py-3 text-lg">
+              {loading ? "Verificando..." : requierePassword ? "Ingresar" : "Continuar"}
             </button>
           </form>
 

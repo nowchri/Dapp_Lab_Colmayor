@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/auth";
 
 // PUT /api/inventario/[id] — cambiar estado del activo
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
-  const ck = cookies();
-  const rol = ck.get("userRol")?.value;
-  if (rol !== "monitor" && rol !== "admin") {
+  const usuario = await getSessionUser();
+  if (!usuario || (usuario.rol !== "monitor" && usuario.rol !== "admin")) {
     return NextResponse.json({ error: "Solo monitores/admin pueden cambiar estados" }, { status: 403 });
   }
   const body = await request.json().catch(() => ({}));
-  const { estado, id_categoria, stock_actual } = body;
+  const { estado, id_categoria, stock_actual, observaciones_iniciales } = body;
   const pool = getPool();
 
   if (estado) {
@@ -31,14 +30,20 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
     await pool.query("UPDATE activos SET stock_actual = $1 WHERE id_activo = $2", [stock_actual, params.id]);
   }
 
+  if (observaciones_iniciales !== undefined) {
+    if (typeof observaciones_iniciales !== "string") {
+      return NextResponse.json({ error: "Observaciones invalidas" }, { status: 400 });
+    }
+    await pool.query("UPDATE activos SET observaciones_iniciales = $1 WHERE id_activo = $2", [observaciones_iniciales || null, params.id]);
+  }
+
   return NextResponse.json({ ok: true });
 }
 
 // DELETE /api/inventario/[id] — eliminar un componente de kit
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
-  const ck = cookies();
-  const rol = ck.get("userRol")?.value;
-  if (rol !== "monitor" && rol !== "admin") {
+  const usuario = await getSessionUser();
+  if (!usuario || (usuario.rol !== "monitor" && usuario.rol !== "admin")) {
     return NextResponse.json({ error: "No autorizado" }, { status: 403 });
   }
   const pool = getPool();

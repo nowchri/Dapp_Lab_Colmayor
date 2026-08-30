@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/auth";
 import { sendConfirmacionPrestamo } from "@/lib/email";
 import { computeLoanHash, computeAssetHash, computeStudentHash } from "@/lib/polygon";
 import { registrarEnCadena } from "@/lib/cadena";
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const ck = cookies();
-  const rol = ck.get("userRol")?.value;
-  const uid = ck.get("userId")?.value;
+  const usuario = await getSessionUser();
+  const rol = usuario?.rol || "";
+  const uid = usuario?.id_perfil || "";
   if (rol !== "monitor" && rol !== "admin") {
     return NextResponse.json({ error: "Solo monitores pueden aprobar" }, { status: 403 });
   }
@@ -36,7 +36,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   // Items de la bolsa
   const detalles = await pool.query(
-    "SELECT dp.id_activo, a.nombre_activo, a.tipo, a.codigo_qr, dp.cantidad_entregada FROM detalles_prestamo dp JOIN activos a ON dp.id_activo = a.id_activo WHERE dp.id_prestamo = $1 AND dp.esta_devuelto = false",
+    `SELECT dp.id_activo, a.nombre_activo, a.tipo, a.codigo_qr, dp.cantidad_entregada, ar.nombre_area
+     FROM detalles_prestamo dp
+     JOIN activos a ON dp.id_activo = a.id_activo
+     LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
+     LEFT JOIN areas ar ON c.id_area = ar.id_area
+     WHERE dp.id_prestamo = $1 AND dp.esta_devuelto = false`,
     [id_prestamo]
   );
   if (detalles.rows.length === 0) {
@@ -46,12 +51,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   // 1. Hashing (RF-10): nunca datos personales en cadena
   const loanHash = computeLoanHash(id_prestamo);
   const studentHash = computeStudentHash(p.id_estudiante);
-  const assetHashes = detalles.rows.map((d: any) => computeAssetHash(d.codigo_qr || d.id_activo));
-
   // 2. Registrar en la cadena local (registro_blockchain, encadenado por hash)
+  const eslabones = detalles.rows.map((d: any) => ({
+    assetHash: computeAssetHash(d.codigo_qr || d.id_activo),
+    id_activo: d.id_activo,
+    estado: "prestado",
+    ubicacion: d.nombre_area || "",
+  }));
   let txHashes: string[] = [];
   try {
-    txHashes = await registrarEnCadena("loan", id_prestamo, loanHash, assetHashes, studentHash);
+    txHashes = await registrarEnCadena("loan", id_prestamo, loanHash, eslabones, studentHash, p.id_estudiante, uid || "");
   } catch (err: any) {
     console.error("[cadena] Error registrando préstamo:", err?.message || err);
     return NextResponse.json({ error: "No se pudo registrar la trazabilidad. Reintentá." }, { status: 502 });

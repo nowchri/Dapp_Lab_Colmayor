@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/auth";
 import { computeLoanHash, computeAssetHash, computeStudentHash } from "@/lib/polygon";
 import { registrarEnCadena } from "@/lib/cadena";
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const ck = cookies();
-  const rol = ck.get("userRol")?.value;
-  const userId = ck.get("userId")?.value;
+  const usuario = await getSessionUser();
+  const rol = usuario?.rol || "";
+  const userId = usuario?.id_perfil || "";
   if (rol !== "monitor" && rol !== "admin") {
     return NextResponse.json({ error: "Solo monitores pueden registrar devoluciones" }, { status: 403 });
   }
@@ -25,25 +25,32 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const studentHash = computeStudentHash(idEstudiante);
 
   if (items_devueltos) {
-    // 1. Registrar devoluciones on-chain (1 tx por activo).
-    //    Si falla (ej. préstamo anterior sin registro en cadena), se loguea
-    //    pero la devolución en BD se completa igual.
-    const assetHashes: string[] = [];
-    const detalleIds: string[] = [];
+    // 1. Registrar devoluciones en la cadena (con datos completos).
+    //    Si falla, se loguea pero la devolución en BD se completa igual.
+    const eslabones = [];
     for (const item of items_devueltos) {
       const info = await pool.query(
-        "SELECT a.codigo_qr, a.id_activo FROM activos a JOIN detalles_prestamo dp ON dp.id_activo = a.id_activo WHERE dp.id_detalle = $1",
+        `SELECT a.codigo_qr, a.id_activo, ar.nombre_area
+         FROM activos a
+         JOIN detalles_prestamo dp ON dp.id_activo = a.id_activo
+         LEFT JOIN categorias c ON a.id_categoria = c.id_categoria
+         LEFT JOIN areas ar ON c.id_area = ar.id_area
+         WHERE dp.id_detalle = $1`,
         [item.id_detalle]
       );
       if (info.rows.length > 0) {
-        assetHashes.push(computeAssetHash(info.rows[0].codigo_qr || info.rows[0].id_activo));
-        detalleIds.push(item.id_detalle);
+        eslabones.push({
+          assetHash: computeAssetHash(info.rows[0].codigo_qr || info.rows[0].id_activo),
+          id_activo: info.rows[0].id_activo,
+          estado: item.estado_final || "disponible",
+          ubicacion: info.rows[0].nombre_area || "",
+        });
       }
     }
-    if (assetHashes.length > 0) {
+    if (eslabones.length > 0) {
       let returnHashes: string[] = [];
       try {
-        returnHashes = await registrarEnCadena("return", id_prestamo, loanHash, assetHashes, studentHash);
+        returnHashes = await registrarEnCadena("return", id_prestamo, loanHash, eslabones, studentHash, idEstudiante, userId || "");
         console.log(`[cadena] Devolución registrada: ${returnHashes.length} eslabones`);
       } catch (err: any) {
         console.error("[cadena] Error registrando devolución (se continúa en BD):", err?.message || err);

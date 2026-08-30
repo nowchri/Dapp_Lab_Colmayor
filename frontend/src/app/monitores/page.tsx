@@ -23,6 +23,7 @@ export default function MonitoresPage() {
     nombre_completo: "",
     correo_institucional: "",
     telefono: "",
+    password: "",
   });
 
   useEffect(() => { cargarMonitores(); }, []);
@@ -58,13 +59,22 @@ export default function MonitoresPage() {
       }
       toast.success("Monitor creado correctamente");
       setShowForm(false);
-      setForm({ codigo_estudiantil: "", cedula: "", nombre_completo: "", correo_institucional: "", telefono: "" });
+      setForm({ codigo_estudiantil: "", cedula: "", nombre_completo: "", correo_institucional: "", telefono: "", password: "" });
       cargarMonitores();
     } catch {
       toast.error("Error de conexion");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function resetearPassword(id: string, nombre: string) {
+    if (!confirm(`¿Resetear la contraseña de ${nombre}? Podrá crear una nueva en su próximo ingreso.`)) return;
+    try {
+      const res = await fetch(`/api/monitores/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reset_password: true }) });
+      if (res.ok) toast.success("Contraseña reseteada. El monitor creará una nueva al entrar.");
+      else { const e = await res.json(); toast.error(e.error || "Error"); }
+    } catch { toast.error("Error de conexión"); }
   }
 
   async function eliminarMonitor(id: string, nombre: string) {
@@ -146,6 +156,16 @@ export default function MonitoresPage() {
                   placeholder="monitor@unimayor.edu.co"
                 />
               </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-iu-dark mb-1">Contraseña (opcional)</label>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none"
+                  placeholder="Mínimo 6 caracteres — si la dejas vacía, el monitor la crea en su primer ingreso"
+                />
+              </div>
             </div>
             <button type="submit" disabled={saving} className="btn-primary">
               {saving ? "Creando..." : "Crear Monitor"}
@@ -170,11 +190,18 @@ export default function MonitoresPage() {
                       {m.telefono && ` · ${m.telefono}`}
                     </p>
                   </div>
-                  <button
-                    onClick={() => eliminarMonitor(m.id_perfil, m.nombre_completo)}
-                    className="text-xs px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100"
-                    title="Eliminar monitor"
-                  >🗑️ Eliminar</button>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      onClick={() => resetearPassword(m.id_perfil, m.nombre_completo)}
+                      className="text-xs px-2 py-1 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100"
+                      title="Resetear contraseña (el monitor creará una nueva)"
+                    >🔑 Resetear</button>
+                    <button
+                      onClick={() => eliminarMonitor(m.id_perfil, m.nombre_completo)}
+                      className="text-xs px-2 py-1 rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100"
+                      title="Eliminar monitor"
+                    >🗑️ Eliminar</button>
+                  </div>
                 </div>
               ))}
             </div>

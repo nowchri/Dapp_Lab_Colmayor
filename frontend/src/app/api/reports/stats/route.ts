@@ -9,6 +9,7 @@ export async function GET() {
        (SELECT COUNT(*) FROM activos WHERE estado = 'disponible' AND id_activo_padre IS NULL) as disponibles,
        (SELECT COUNT(*) FROM activos WHERE estado = 'prestado' AND id_activo_padre IS NULL) as prestados,
        (SELECT COUNT(*) FROM activos WHERE estado = 'dañado' AND id_activo_padre IS NULL) as danados,
+       (SELECT COUNT(*) FROM activos WHERE estado = 'mantenimiento' AND id_activo_padre IS NULL) as mantenimiento,
        (SELECT COUNT(*) FROM prestamos WHERE estado_general = 'activo') as prestamos_activos,
        (SELECT COUNT(*) FROM prestamos WHERE estado_general = 'devuelto') as devueltos,
        (SELECT COUNT(*) FROM prestamos WHERE estado_general = 'mora') as en_mora,

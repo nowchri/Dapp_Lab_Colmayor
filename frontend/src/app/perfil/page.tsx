@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import PasswordInput from "@/components/PasswordInput";
 
 const AVATARS = [
   { id: "atom", label: "Atomo", svg: '<svg viewBox="0 0 80 80" fill="none"><circle cx="40" cy="40" r="12" fill="#09488D"/><ellipse cx="40" cy="40" rx="32" ry="10" stroke="#F7C800" strokeWidth="2" transform="rotate(0 40 40)"/><ellipse cx="40" cy="40" rx="32" ry="10" stroke="#F7C800" strokeWidth="2" transform="rotate(60 40 40)"/><ellipse cx="40" cy="40" rx="32" ry="10" stroke="#F7C800" strokeWidth="2" transform="rotate(120 40 40)"/></svg>' },
@@ -28,6 +29,32 @@ export default function PerfilPage() {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ nombre_completo: "", telefono: "" });
   const [saving, setSaving] = useState(false);
+  const [passActual, setPassActual] = useState("");
+  const [passNueva, setPassNueva] = useState("");
+  const [passNueva2, setPassNueva2] = useState("");
+  const [savingPass, setSavingPass] = useState(false);
+
+  async function cambiarContrasena(e: React.FormEvent) {
+    e.preventDefault();
+    if (passNueva.length < 6) return toast.error("La contraseña debe tener al menos 6 caracteres");
+    if (passNueva !== passNueva2) return toast.error("Las contraseñas no coinciden");
+    setSavingPass(true);
+    try {
+      const res = await fetch("/api/auth/set-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ current: passActual || undefined, password: passNueva, password2: passNueva2 }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        toast.success("Contraseña actualizada");
+        setPassActual(""); setPassNueva(""); setPassNueva2("");
+      } else {
+        toast.error(d.error || "Error al cambiar la contraseña");
+      }
+    } catch { toast.error("Error de conexión"); }
+    finally { setSavingPass(false); }
+  }
 
   useEffect(() => {
     fetch("/api/perfil")
@@ -189,6 +216,33 @@ export default function PerfilPage() {
             </form>
           )}
         </div>
+
+        {/* CAMBIAR CONTRASEÑA (solo admin/monitor) */}
+        {(perfil.rol === "admin" || perfil.rol === "monitor") && (
+          <div className="bg-white/80 backdrop-blur border border-white rounded-[14px] p-6 shadow-[0_4px_16px_rgba(0,0,0,0.04)]">
+            <h2 className="font-bold text-[#09488D] mb-1">🔑 Cambiar contraseña</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Tu cuenta de {perfil.rol} requiere contraseña para entrar. Podés cambiarla cuando quieras.
+            </p>
+            <form onSubmit={cambiarContrasena} className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Contraseña actual</label>
+                <PasswordInput value={passActual} onChange={setPassActual} placeholder="Tu contraseña actual" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nueva contraseña</label>
+                <PasswordInput value={passNueva} onChange={setPassNueva} placeholder="Mínimo 6 caracteres" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Confirmar nueva contraseña</label>
+                <PasswordInput value={passNueva2} onChange={setPassNueva2} placeholder="Repetí la nueva contraseña" />
+              </div>
+              <button type="submit" disabled={savingPass} className="btn-primary w-full text-sm">
+                {savingPass ? "Guardando..." : "Cambiar contraseña"}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

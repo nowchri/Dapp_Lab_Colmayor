@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/auth";
 
 export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
-  const ck = cookies();
-  const rol = ck.get("userRol")?.value;
+  const usuario = await getSessionUser();
+  const rol = usuario?.rol || "";
   if (rol !== "monitor" && rol !== "admin") {
     return NextResponse.json({ error: "Solo monitores pueden rechazar" }, { status: 403 });
   }

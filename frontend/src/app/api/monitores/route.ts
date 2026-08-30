@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
+import bcrypt from "bcryptjs";
 
 // PUNTO DE CONEXION EXTERNA: PostgreSQL local
 // GET — listar todos los monitores
@@ -15,7 +16,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { codigo_estudiantil, cedula, nombre_completo, correo_institucional, telefono } = body;
+    const { codigo_estudiantil, cedula, nombre_completo, correo_institucional, telefono, password } = body;
 
     if (!nombre_completo || !correo_institucional || !codigo_estudiantil) {
       return NextResponse.json({ error: "Nombre, correo y codigo son obligatorios" }, { status: 400 });
@@ -35,11 +36,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Ya existe un perfil con ese correo o codigo" }, { status: 400 });
     }
 
+    // Contraseña opcional: si no se define, el monitor la crea en su primer ingreso
+    let password_hash: string | null = null;
+    if (password) {
+      if (String(password).length < 6) {
+        return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 });
+      }
+      password_hash = await bcrypt.hash(String(password), 10);
+    }
+
     const r = await pool.query(
-      `INSERT INTO perfiles (codigo_estudiantil, cedula, nombre_completo, correo_institucional, telefono, rol)
-       VALUES ($1, $2, $3, $4, $5, 'monitor')
+      `INSERT INTO perfiles (codigo_estudiantil, cedula, nombre_completo, correo_institucional, telefono, rol, password_hash)
+       VALUES ($1, $2, $3, $4, $5, 'monitor', $6)
        RETURNING id_perfil`,
-      [codigo_estudiantil.trim(), cedula || null, nombre_completo.trim(), email, telefono || null]
+      [codigo_estudiantil.trim(), cedula || null, nombre_completo.trim(), email, telefono || null, password_hash]
     );
 
     return NextResponse.json({ ok: true, id_perfil: r.rows[0].id_perfil }, { status: 201 });

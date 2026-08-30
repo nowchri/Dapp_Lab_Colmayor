@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
-import { cookies } from "next/headers";
+import { getSessionUser } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
   try {
-    const ck = cookies();
-    const userId = ck.get("userId")?.value;
-    const rol = ck.get("userRol")?.value;
+    const usuario = await getSessionUser();
+    const userId = usuario?.id_perfil || "";
+    const rol = usuario?.rol || "";
 
     if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
     const body = await request.json();
-    const { items, dias_prestamo, nombre_docente, materia, profesor_encargado, curso_grupo } = body;
+    const { items, dias_prestamo, fecha_limite, nombre_docente, materia, profesor_encargado, curso_grupo } = body;
 
     if (!items || items.length === 0) return NextResponse.json({ error: "La bolsa está vacía" }, { status: 400 });
 
@@ -30,12 +30,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const fechaLimite = `NOW() + INTERVAL '${dias_prestamo || 8} days'`;
+    const dias = parseInt(dias_prestamo) || 8;
+    const fechaLimiteISO = fecha_limite
+      ? (typeof fecha_limite === "string" && /^\d{4}-\d{2}-\d{2}$/.test(fecha_limite) ? fecha_limite : null)
+      : new Date(Date.now() + dias * 86400000).toISOString().split("T")[0];
 
     const result = await pool.query(
       `INSERT INTO prestamos (id_estudiante, fecha_limite, materia, profesor_encargado, curso_grupo, estado_general, nombre_docente)
-       VALUES ($1, ${fechaLimite}, $2, $3, $4, 'pendiente', $5) RETURNING id_prestamo`,
-      [idEstudiante, materia || null, profesor_encargado || null, curso_grupo || null, nombre_docente || null]
+       VALUES ($1, $6::date, $2, $3, $4, 'pendiente', $5) RETURNING id_prestamo`,
+      [idEstudiante, materia || null, profesor_encargado || null, curso_grupo || null, nombre_docente || null, fechaLimiteISO]
     );
 
     const idPrestamo = result.rows[0].id_prestamo;
@@ -56,9 +59,9 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const ck = cookies();
-    const userId = ck.get("userId")?.value;
-    const rol = ck.get("userRol")?.value;
+    const usuario = await getSessionUser();
+    const userId = usuario?.id_perfil || "";
+    const rol = usuario?.rol || "";
     if (!userId) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
     const pool = getPool();
