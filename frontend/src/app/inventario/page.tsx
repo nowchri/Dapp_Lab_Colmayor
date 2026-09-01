@@ -105,7 +105,9 @@ function Modal({ activo, rol, onClose, onAgregarBolsa, onSolicitarYa, enCarrito,
             <p className="text-sm font-bold text-[#09488D] mt-1">{activo.nombre_activo}</p>
             <p className="text-[10px] text-slate-500 mt-0.5">{activo.nombre_area || ""}{activo.nombre_categoria ? " · " + activo.nombre_categoria : ""}</p>
             <p className="text-[9px] text-slate-400 mt-1">UNIMAYOR · LAB</p>
-            <a href={`/api/reports/sticker/${activo.id_activo}`} target="_blank" rel="noopener" className="text-xs bg-[#09488D] text-white px-4 py-1.5 rounded-lg hover:bg-[#073a6b] transition mt-2 inline-block">📥 Descargar sticker</a>
+            {(rol === "admin" || rol === "monitor") && (
+              <a href={`/api/reports/sticker/${activo.id_activo}`} target="_blank" rel="noopener" className="text-xs bg-[#09488D] text-white px-4 py-1.5 rounded-lg hover:bg-[#073a6b] transition mt-2 inline-block">📥 Descargar sticker</a>
+            )}
           </div>
         )}
 

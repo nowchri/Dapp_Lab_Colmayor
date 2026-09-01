@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
 import bcrypt from "bcryptjs";
+export const dynamic = "force-dynamic";
 
 // PUNTO DE CONEXION EXTERNA: PostgreSQL local
 // GET — listar todos los monitores
 export async function GET() {
+  const usuario = await getSessionUser();
+  if (!usuario || usuario.rol !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   const pool = getPool();
   const r = await pool.query(
     "SELECT id_perfil, codigo_estudiantil, nombre_completo, correo_institucional, telefono FROM perfiles WHERE rol = 'monitor' ORDER BY nombre_completo"

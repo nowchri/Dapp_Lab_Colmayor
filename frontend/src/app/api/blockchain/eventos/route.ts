@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getEventosRecientes } from "@/lib/cadena";
+export const dynamic = "force-dynamic";
 
 // GET /api/blockchain/eventos — eventos recientes de la cadena (dashboard)
 export async function GET() {

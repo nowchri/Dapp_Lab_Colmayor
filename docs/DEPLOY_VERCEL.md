@@ -37,9 +37,17 @@ Project → **Settings → Environment Variables** (agregar TODAS, una por una):
 | `ADMIN_EMAIL` | Correo del admin |
 | `DECANATURA_EMAIL` | Correo de decanatura (alertas de mora) |
 | `NEXT_PUBLIC_EMAIL_REGEX` | `@unimayor.edu.co` |
+| `VAPID_PUBLIC_KEY` | Clave pública VAPID (Web Push — ver .env local) |
+| `VAPID_PRIVATE_KEY` | Clave privada VAPID (Web Push — ver .env local) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Igual que VAPID_PUBLIC_KEY (la lee el navegador) |
+| `CRON_SECRET` | Secreto para el cron de recordatorios (ver .env local) |
+| `SMTP_HOST` | `smtp.gmail.com` |
+| `SMTP_PORT` | `465` |
+| `SMTP_USER` | `cristian_santiago@unimayor.edu.co` |
+| `SMTP_PASS` | App password de Gmail (en .env local) |
 
 > `NEXT_PUBLIC_*` se exponen al navegador (por eso solo van las que son públicas).
-> `SERVER_PRIVATE_KEY` y `DATABASE_URL` quedan del lado del servidor.
+> `SERVER_PRIVATE_KEY`, `DATABASE_URL`, `SMTP_PASS`, `VAPID_PRIVATE_KEY` y `CRON_SECRET` quedan del lado del servidor.
 
 ## 4. Deploy
 
@@ -55,6 +63,21 @@ Project → **Settings → Environment Variables** (agregar TODAS, una por una):
    - `SUPABASE_ANON_KEY` = la publishable key (Supabase → Settings → API)
 3. El workflow `.github/workflows/keep-supabase-alive.yml` ya está en el repo
    y se ejecuta solo cada 2 días (ver pestaña **Actions**)
+
+## 6. Recordatorios push (PWA)
+
+1. GitHub → **Settings → Secrets and variables → Actions** — agregar 2 secrets más:
+   - `APP_URL` = la URL de producción en Vercel (`https://<proyecto>.vercel.app`)
+   - `CRON_SECRET` = el mismo valor de la env var `CRON_SECRET` del .env local
+2. El workflow `.github/workflows/recordatorios-push.yml` ya está en el repo:
+   todos los días llama a `/api/cron/recordatorios`, que envía **una sola
+   notificación por préstamo, el día antes de vencer** (o el mismo día si el
+   cron anterior no corrió). Nada de notificaciones diarias: solo avisa cuando
+   falta un día (o vence hoy).
+3. En el celular: el estudiante ve el banner "¿Querés recordatorios?" → Activar
+   → permisos → recibe las notificaciones (y puede instalar la app como PWA:
+   Android: menú → "Instalar app" · iPhone: Compartir → "Agregar a inicio";
+   en iPhone las notificaciones push requieren la app instalada y iOS 16.4+).
 
 ## Notas
 

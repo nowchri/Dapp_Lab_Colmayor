@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
 
 // PUT — resetear contraseña (la limpia → el monitor crea una nueva en su primer ingreso)
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+  const usuario = await getSessionUser();
+  if (!usuario || usuario.rol !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   try {
     const body = await request.json().catch(() => ({}));
     const pool = getPool();
@@ -22,6 +27,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 // DELETE — eliminar monitor
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  const usuario = await getSessionUser();
+  if (!usuario || usuario.rol !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   try {
     const pool = getPool();
     const r = await pool.query("DELETE FROM perfiles WHERE id_perfil = $1 AND rol = 'monitor' RETURNING id_perfil", [params.id]);
