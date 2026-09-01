@@ -1,0 +1,18 @@
+name: recordatorios-push
+
+on:
+  schedule:
+    # Todos los días 8:00 AM hora de Colombia (UTC-5) → 13:00 UTC
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+jobs:
+  enviar-recordatorios:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enviar recordatorios de devolución (Web Push)
+        run: |
+          curl -s -f -X POST "${{ secrets.APP_URL }}/api/cron/recordatorios" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{}' || echo "::warning::Fallo al enviar recordatorios (revisar secrets APP_URL/CRON_SECRET)"

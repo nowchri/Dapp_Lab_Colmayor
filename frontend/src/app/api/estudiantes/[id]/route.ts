@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
+import { getSessionUser } from "@/lib/auth";
 
 // PUT — modificar datos del estudiante
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+    const usuario = await getSessionUser();
+  if (!usuario || usuario.rol !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   try {
     const body = await request.json();
     const { nombre_completo, codigo_estudiantil, cedula, telefono, correo_institucional } = body;
@@ -19,6 +24,10 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 
 // DELETE — eliminar estudiante
 export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+    const usuario = await getSessionUser();
+  if (!usuario || usuario.rol !== "admin") {
+    return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+  }
   try {
     const pool = getPool();
     // Check no active loans
