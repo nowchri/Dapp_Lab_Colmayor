@@ -1,8 +1,10 @@
 "use client";
 
 // PushNotifier — PWA: activa las notificaciones del celular (recordatorios de devolución).
-// Muestra un banner discreto solo a usuarios logueados que aún no decidieron.
+// Muestra un banner discreto a usuarios logueados que aún no decidieron.
+// Se re-evalúa en cada cambio de ruta (no solo al recargar).
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import toast from "react-hot-toast";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
@@ -17,33 +19,43 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
 export default function PushNotifier() {
   const [visible, setVisible] = useState(false);
   const [activando, setActivando] = useState(false);
+  const pathname = usePathname();
 
+  // Re-evaluar en cada navegación: tras el login (sin recargar) debe aparecer
   useEffect(() => {
-    // Solo usuarios logueados y que no hayan decidido ya
+    setVisible(false);
     if (typeof window === "undefined") return;
+
     const logueado = document.cookie.includes("userRol=");
     if (!logueado) return;
-    if (localStorage.getItem("pushDecision") === "si" || localStorage.getItem("pushDecision") === "no") return;
+    // No molestar en pantallas de entrada
+    if (pathname === "/login" || pathname === "/register" || pathname === "/primer-ingreso") return;
+
+    const decision = localStorage.getItem("pushDecision");
+    if (decision === "si" || decision === "no") return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    // Si ya tiene permiso, suscribirse silenciosamente
+
     if (Notification.permission === "granted") {
+      // Ya tiene permiso → suscribirse silenciosamente (sin banner)
       suscribir().catch(() => {});
       return;
     }
     if (Notification.permission === "default") {
-      // Mostrar banner tras 1.5s (discreto, esquina)
-      const t = setTimeout(() => setVisible(true), 1500);
+      const t = setTimeout(() => setVisible(true), 1200);
       return () => clearTimeout(t);
     }
-  }, []);
+    // "denied" → no mostrar nada
+  }, [pathname]);
 
   async function suscribir() {
     const reg = await navigator.serviceWorker.register("/sw.js");
     await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({
+    // Idempotente: si ya hay suscripción, reutilizarla
+    const existente = await reg.pushManager.getSubscription();
+    const sub = existente || (await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ""),
-    });
+    }));
     const res = await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

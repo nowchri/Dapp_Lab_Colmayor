@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import PasswordInput from "@/components/PasswordInput";
 
@@ -10,6 +10,19 @@ export default function LoginPage() {
   const [requierePassword, setRequierePassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorTxt, setErrorTxt] = useState("");
+
+  // Si ya hay sesión (p. ej. volver con la flecha ← desde el dashboard), salir del login.
+  // Cubre tanto el montaje normal como la restauración desde bfcache (pageshow persisted).
+  useEffect(() => {
+    const salir = () => {
+      if (document.cookie.includes("userRol=")) router.replace("/dashboard");
+    };
+    salir();
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted) salir();
+    });
+    return () => window.removeEventListener("pageshow", salir);
+  }, [router]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -39,12 +52,12 @@ export default function LoginPage() {
 
       // Primer ingreso de admin/monitor → crear contraseña
       if (data.primer_ingreso) {
-        router.push("/primer-ingreso");
+        router.replace("/primer-ingreso");
         return;
       }
 
-      // Redirect on success
-      router.push("/dashboard");
+      // Redirect on success (replace: el login no queda en el historial)
+      router.replace("/dashboard");
     } catch {
       setErrorTxt("Error de conexion");
     } finally {

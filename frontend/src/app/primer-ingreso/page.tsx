@@ -14,7 +14,7 @@ export default function PrimerIngresoPage() {
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(d => {
       if (!d.authenticated) router.push("/login");
-      else if (d.user.rol !== "admin" && d.user.rol !== "monitor") router.push("/dashboard");
+      else if (d.user.rol !== "admin" && d.user.rol !== "monitor") router.replace("/dashboard");
     }).catch(() => router.push("/login"));
   }, [router]);
 
@@ -32,7 +32,7 @@ export default function PrimerIngresoPage() {
       const d = await res.json();
       if (res.ok) {
         toast.success("Contraseña creada correctamente");
-        router.push("/dashboard");
+        router.replace("/dashboard");
       } else {
         toast.error(d.error || "Error al guardar");
       }

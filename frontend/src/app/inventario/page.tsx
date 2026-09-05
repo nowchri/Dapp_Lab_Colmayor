@@ -80,7 +80,7 @@ function Modal({ activo, rol, onClose, onAgregarBolsa, onSolicitarYa, enCarrito,
   if (!activo) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white/95 rounded-[14px] p-6 max-w-md w-full m-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white space-y-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-white/95 rounded-[14px] p-6 max-w-md w-full m-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white space-y-4 max-h-[90vh] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <h2 className="text-xl font-bold text-[#09488D]">{activo.nombre_activo}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
@@ -221,7 +221,7 @@ function ComprobarModal({ activos, onClose }: { activos: Activo[]; onClose: () =
   return (
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
-        <div className="bg-white/95 rounded-[14px] p-6 max-w-md w-full m-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="bg-white/95 rounded-[14px] p-6 max-w-md w-full m-4 shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-white space-y-4 max-h-[90vh] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
           <div className="flex items-start justify-between">
             <h2 className="text-xl font-bold text-[#09488D]">✅ Comprobar activo</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>

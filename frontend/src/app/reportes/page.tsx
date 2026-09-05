@@ -78,10 +78,16 @@ function BarChart({ trazables, consumibles, tPrestados, cPrestados }: { trazable
 
 export default function ReportesPage() {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [topActivos, setTopActivos] = useState<any[]>([]);
+  const [paginaTop, setPaginaTop] = useState(0);
   const [loading, setLoading] = useState(true);
+  const POR_PAGINA = 10;
+  const totalPaginas = Math.max(1, Math.ceil(topActivos.length / POR_PAGINA));
+  const topPagina = topActivos.slice(paginaTop * POR_PAGINA, (paginaTop + 1) * POR_PAGINA);
 
   useEffect(() => {
-    fetch("/api/reports/stats").then(r => r.json()).then(setStats).catch(() => {}).finally(() => setLoading(false));
+    fetch("/api/reports/stats").then(r => r.json()).then(setStats).catch(() => {});
+    fetch("/api/reports/top-activos").then(r => r.json()).then(setTopActivos).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   if (loading) return (
@@ -196,11 +202,77 @@ export default function ReportesPage() {
           </div>
         </div>
 
+        {/* ─── SECTION 2.5: Top activos más prestados ─── */}
+        <div className="card-glass">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-bold text-[#09488D]">🏆 Activos más prestados</h2>
+            <span className="text-xs text-slate-400">{topActivos.length > 0 ? `Top ${topActivos.length}` : ""}</span>
+          </div>
+          {topActivos.length === 0 ? (
+            <p className="text-sm text-slate-400">Sin préstamos registrados todavía.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-slate-400 border-b border-slate-100">
+                    <th className="py-2 pr-2">#</th>
+                    <th className="py-2 pr-2">Activo</th>
+                    <th className="py-2 pr-2 hidden sm:table-cell">Categoría</th>
+                    <th className="py-2 pr-2 text-center">Préstamos</th>
+                    <th className="py-2 pr-2 text-center">Devueltos</th>
+                    <th className="py-2 pr-2 text-center">En curso</th>
+                    <th className="py-2 text-center">En mora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topPagina.map((a, i) => (
+                    <tr key={paginaTop * POR_PAGINA + i} className="border-b border-slate-50 hover:bg-[#09488D]/5 transition">
+                      <td className="py-2.5 pr-2 font-bold text-[#09488D]">#{paginaTop * POR_PAGINA + i + 1}</td>
+                      <td className="py-2.5 pr-2">
+                        <p className="font-medium text-slate-700">{a.nombre_activo}</p>
+                        <p className="text-[11px] text-slate-400 sm:hidden">{a.nombre_categoria || ""} · {a.tipo}</p>
+                      </td>
+                      <td className="py-2.5 pr-2 hidden sm:table-cell text-slate-500">{a.nombre_categoria || "—"}</td>
+                      <td className="py-2.5 pr-2 text-center">
+                        <span className="inline-block min-w-7 px-2 py-0.5 rounded-full bg-[#09488D] text-white text-xs font-bold">{a.total_prestamos}</span>
+                      </td>
+                      <td className="py-2.5 pr-2 text-center text-emerald-600 font-medium">{a.devueltos}</td>
+                      <td className="py-2.5 pr-2 text-center text-[#09488D] font-medium">{a.en_curso}</td>
+                      <td className="py-2.5 text-center text-rose-600 font-medium">{a.en_mora}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {topActivos.length > POR_PAGINA && (
+            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setPaginaTop((p) => Math.max(0, p - 1))}
+                disabled={paginaTop === 0}
+                className="flex items-center gap-1 text-sm font-medium text-[#09488D] disabled:text-slate-300 disabled:cursor-not-allowed transition"
+              >
+                ❮ Anterior
+              </button>
+              <span className="text-xs text-slate-400">
+                Página {paginaTop + 1} de {totalPaginas} · {topActivos.length} activos
+              </span>
+              <button
+                onClick={() => setPaginaTop((p) => Math.min(totalPaginas - 1, p + 1))}
+                disabled={paginaTop >= totalPaginas - 1}
+                className="flex items-center gap-1 text-sm font-medium text-[#09488D] disabled:text-slate-300 disabled:cursor-not-allowed transition"
+              >
+                Siguiente ❯
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* ─── SECTION 3: Export ─── */}
         {/* ─── Download buttons ─── */}
         <div className="card-glass">
           <h2 className="font-bold text-[#09488D] mb-4">📥 Descargar Reportes</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <a
               href="/api/reports/excel"
               className="flex items-center gap-3 p-4 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 transition group"
@@ -209,6 +281,17 @@ export default function ReportesPage() {
               <div>
                 <p className="font-semibold text-emerald-700 text-sm">Inventario Excel</p>
                 <p className="text-xs text-emerald-500">Todos los activos en formato CSV</p>
+              </div>
+            </a>
+
+            <a
+              href="/api/reports/excel-prestamos"
+              className="flex items-center gap-3 p-4 rounded-xl border border-sky-200 bg-sky-50 hover:bg-sky-100 transition group"
+            >
+              <span className="text-2xl">📋</span>
+              <div>
+                <p className="font-semibold text-sky-700 text-sm">Historial de Préstamos Excel</p>
+                <p className="text-xs text-sky-500">Cada activo prestado con su estudiante y el monitor que lo autorizó</p>
               </div>
             </a>
 
