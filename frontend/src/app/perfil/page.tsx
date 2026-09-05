@@ -33,26 +33,35 @@ export default function PerfilPage() {
   const [passNueva, setPassNueva] = useState("");
   const [passNueva2, setPassNueva2] = useState("");
   const [savingPass, setSavingPass] = useState(false);
+  const [passMsg, setPassMsg] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
 
   async function cambiarContrasena(e: React.FormEvent) {
     e.preventDefault();
-    if (passNueva.length < 6) return toast.error("La contraseña debe tener al menos 6 caracteres");
-    if (passNueva !== passNueva2) return toast.error("Las contraseñas no coinciden");
+    setPassMsg(null);
+    if (!passActual.trim()) return setPassMsg({ tipo: "error", texto: "Escribí tu contraseña actual" });
+    if (passNueva.length < 6) return setPassMsg({ tipo: "error", texto: "La contraseña nueva debe tener al menos 6 caracteres" });
+    if (passNueva !== passNueva2) return setPassMsg({ tipo: "error", texto: "Las contraseñas nuevas no coinciden" });
     setSavingPass(true);
     try {
       const res = await fetch("/api/auth/set-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ current: passActual || undefined, password: passNueva, password2: passNueva2 }),
+        body: JSON.stringify({ current: passActual, password: passNueva, password2: passNueva2 }),
       });
-      const d = await res.json();
+      const d = await res.json().catch(() => ({}));
       if (res.ok) {
+        setPassMsg({ tipo: "ok", texto: "✅ ¡Contraseña cambiada con éxito! La próxima vez entrás con la nueva." });
         toast.success("Contraseña actualizada");
         setPassActual(""); setPassNueva(""); setPassNueva2("");
       } else {
-        toast.error(d.error || "Error al cambiar la contraseña");
+        const err = d.error || (res.status === 403 ? "Tu sesión expiró — volvé a entrar" : "Error al cambiar la contraseña");
+        setPassMsg({ tipo: "error", texto: err });
+        toast.error(err);
       }
-    } catch { toast.error("Error de conexión"); }
+    } catch {
+      setPassMsg({ tipo: "error", texto: "Error de conexión — revisá tu internet e intentá de nuevo" });
+      toast.error("Error de conexión");
+    }
     finally { setSavingPass(false); }
   }
 
@@ -240,6 +249,15 @@ export default function PerfilPage() {
               <button type="submit" disabled={savingPass} className="btn-primary w-full text-sm">
                 {savingPass ? "Guardando..." : "Cambiar contraseña"}
               </button>
+              {passMsg && (
+                <p
+                  className={`text-sm font-medium p-2.5 rounded-lg ${
+                    passMsg.tipo === "ok" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-rose-50 text-rose-600 border border-rose-200"
+                  }`}
+                >
+                  {passMsg.texto}
+                </p>
+              )}
             </form>
           </div>
         )}

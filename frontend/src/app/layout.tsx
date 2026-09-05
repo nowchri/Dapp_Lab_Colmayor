@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { Toaster } from "react-hot-toast";
 import NavBar from "@/components/NavBar";
 import GuardPrimerIngreso from "@/components/GuardPrimerIngreso";
 import PushNotifier from "@/components/PushNotifier";
@@ -39,6 +40,7 @@ export default function RootLayout({
         <GuardPrimerIngreso />
         {children}
         <PushNotifier />
+        <Toaster position="top-right" toastOptions={{ duration: 3500 }} />
       </body>
     </html>
   );
