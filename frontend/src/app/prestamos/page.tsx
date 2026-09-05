@@ -88,7 +88,7 @@ function DetallesPopup({ prestamo, onClose }: DetallesPopupProps) {
         {prestamo.blockchain_hash && (
           <div className="bg-[#F4F6F9] border border-slate-200 rounded-xl p-3">
             <p className="text-xs font-medium text-slate-600 mb-1.5">
-              🔐 Tus préstamos están seguros en la blockchain y los puedes consultar en Amoy con este código:
+              Registro de trazabilidad en blockchain:
             </p>
             <div className="space-y-1">
               {prestamo.blockchain_hash.split(",").filter(Boolean).map((h, i) => (
