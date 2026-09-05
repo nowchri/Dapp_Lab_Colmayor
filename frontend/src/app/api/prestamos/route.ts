@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPool } from "@/lib/db";
 import { getSessionUser } from "@/lib/auth";
+import { enviarPushPorRoles } from "@/lib/push";
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,6 +49,23 @@ export async function POST(request: NextRequest) {
         "INSERT INTO detalles_prestamo (id_prestamo, id_activo, cantidad_entregada) VALUES ($1, $2, $3)",
         [idPrestamo, item.id_activo, item.cantidad || 1]
       );
+    }
+
+    // Notificar a monitores/admin: un estudiante solicitó un préstamo (solo flujo estudiante)
+    if (!isDocente) {
+      try {
+        const est = await pool.query("SELECT nombre_completo FROM perfiles WHERE id_perfil = $1", [userId]);
+        const nombreEstudiante = est.rows[0]?.nombre_completo || "Un estudiante";
+        const nItems = items.length;
+        await enviarPushPorRoles(["monitor", "admin"], {
+          title: "🔔 Nueva solicitud de préstamo",
+          body: `${nombreEstudiante} solicitó ${nItems} artículo${nItems === 1 ? "" : "s"}. Revisa la aprobación.`,
+          url: "/prestamos/aprobar",
+          tag: `lab-iu-solicitud-${idPrestamo}`,
+        });
+      } catch (e) {
+        console.error("[prestamos/POST push]", e); // nunca bloquear la solicitud
+      }
     }
 
     return NextResponse.json({ id_prestamo: idPrestamo, ok: true }, { status: 201 });

@@ -60,7 +60,7 @@ function DetallesPopup({ prestamo, onClose }: DetallesPopupProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto overscroll-contain" onClick={e => e.stopPropagation()}>
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-xl font-bold text-[#09488D]">Detalles del préstamo</h2>
@@ -117,7 +117,7 @@ function DetallesPopup({ prestamo, onClose }: DetallesPopupProps) {
           {detalles.length === 0 ? (
             <p className="text-sm text-slate-300">Cargando...</p>
           ) : (
-            <div className="space-y-1 max-h-40 overflow-y-auto">
+            <div className="space-y-1">
               {detalles.map((d: any) => (
                 <div key={d.id_detalle} className="flex items-center justify-between bg-[#F4F6F9] rounded-lg px-3 py-2 text-sm">
                   <span className="text-slate-700">{d.nombre_activo || d.activo_nombre}</span>
