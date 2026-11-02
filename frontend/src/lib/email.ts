@@ -1,18 +1,16 @@
 /**
- * email.ts — Servicio de correos (SendGrid)
+ * email.ts — Servicio de correos (Gmail SMTP)
  *
- * PUNTO DE CONEXION: SendGrid (E5 RESUELTO)
- *   API Key: https://app.sendgrid.com/settings/api_keys
- *   Free tier: 100 emails/día
+ * Transporte: SMTP de Gmail con contraseña de aplicación (2FA activa).
+ *   SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS
  *
  * Plantillas:
  *   - sendConfirmacionPrestamo (RF-19)
- *   - sendAlertaMora (RF-14, D8: solo envía correos, no bloquea)s
+ *   - sendAlertaMora (RF-14, D8: solo envía correos, no bloquea)
  */
 
 import nodemailer from "nodemailer";
 
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY || "";
 const EMAIL_FROM = process.env.EMAIL_FROM || "cristian_santiago@unimayor.edu.co";
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "labadministrador@gmail.com";
 const DECANATURA_EMAIL = process.env.DECANATURA_EMAIL || "labadministrador@gmail.com";
