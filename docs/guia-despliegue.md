@@ -1,191 +1,107 @@
-# Guía de Despliegue a Producción — DApp Lab IUCMC
+# Guía de despliegue — DApp Lab IUCMC
 
-> **Versión:** 1.0 — Julio 2026
-> **Propósito:** Pasos ordenados para pasar de desarrollo local a producción en Vercel.
-
----
-
-## Prerrequisitos
-
-Antes de empezar, asegúrate de tener:
-- [ ] Node.js 18+ instalado
-- [ ] Git instalado
-- [ ] Una cuenta de GitHub (para conectar con Vercel)
-- [ ] Acceso a la cuenta de Firebase del proyecto
-- [ ] Acceso a la cuenta de Alchemy/Infura
-- [ ] Acceso a la cuenta de SendGrid/Resend
+Puesta en marcha local y en producción. Para el detalle de la base de datos, ver
+[`MIGRACION_NEON.md`](./MIGRACION_NEON.md); para los pasos exactos de Vercel,
+[`DEPLOY_VERCEL.md`](./DEPLOY_VERCEL.md).
 
 ---
 
-## Fase 1: Configuración Local
+## 1. Requisitos
+
+- Node.js 20+ y npm
+- Git
+- Cuenta en Neon (PostgreSQL) y en Vercel
+- Cuenta de Gmail con contraseña de aplicación (SMTP)
+
+---
+
+## 2. Local
 
 ```bash
-# 1. Clonar el repositorio
-git clone <repo-url> dapp-lab-iu
-cd dapp-lab-iu
-
-# 2. Instalar dependencias (monorepo)
+git clone https://github.com/nowchri/Dapp_Lab_Colmayor.git
+cd Dapp_Lab_Colmayor
 npm install
 
-# 3. Copiar templates de variables de entorno
-cp frontend/.env.local.example frontend/.env.local
-cp blockchain/.env.example blockchain/.env
+cp frontend/.env.example frontend/.env
+# completar DATABASE_URL (Neon, endpoint -pooler, ?sslmode=require),
+# SMTP_*, EMAIL_FROM, VAPID_*, CRON_SECRET
 
-# 4. Editar .env.local y blockchain/.env con credenciales reales
-# (Ver CONEXIONES_PENDIENTES.md para cada servicio)
+npm run dev            # http://localhost:3000
 ```
 
----
+Variables: la lista completa y su significado está en `frontend/.env.example`. Solo hay **un**
+archivo de entorno (`frontend/.env`), no versionado.
 
-## Fase 2: Firebase (E1)
-
-1. Ir a https://console.firebase.google.com
-2. Crear proyecto → `lab-fisica-iucmc`
-3. Habilitar Authentication → Email/Password
-4. Habilitar Cloud Firestore
-5. En Project Settings > General > Web App > copiar config a `.env.local`
-6. En Project Settings > Service Accounts > generar private key > copiar a `.env.local`
-
-**Verificación:**
-```bash
-cd frontend && npm run dev
-# Abrir http://localhost:3000
-# Debe cargar sin errores de Firebase en consola
-```
-
----
-
-## Fase 3: Blockchain (E2, E3, E4)
+Comprobación rápida de la base:
 
 ```bash
-cd blockchain
-
-# 3a. Generar wallet server-side
-npx hardhat run scripts/generate-wallet.ts
-# Output: Address + Private Key
-# → Pegar en blockchain/.env y frontend/.env.local
-
-# 3b. Fondear wallet con faucet
-# Ir a: https://faucet.polygon.technology/
-# Red: Amoy
-# Address: <la del paso anterior>
-# Verificar: https://amoy.polygonscan.com/address/<address>
-
-# 3c. Compilar smart contract
-npx hardhat compile
-# Debe compilar sin errores
-
-# 3d. Correr tests locales
-npx hardhat test
-# Deben pasar todos (6 tests)
-
-# 3e. Desplegar a Polygon Amoy
-npx hardhat run scripts/deploy.ts --network polygonAmoy
-# Output: CONTRACT_ADDRESS
-# → Pegar en frontend/.env.local como NEXT_PUBLIC_CONTRACT_ADDRESS
+node scripts/migracion/03-verify.mjs
 ```
 
 ---
 
-## Fase 4: Correos (E5)
+## 3. Base de datos
+
+PostgreSQL gestionado en **Neon**. El esquema completo está en
+`scripts/migracion/00-schema.sql` (enums, 10 tablas, secuencia e índices) y es idempotente:
+se puede ejecutar sobre una base vacía para levantarla desde cero.
 
 ```bash
-# 1. Crear cuenta en https://sendgrid.com
-# 2. Settings > API Keys > Create > Full Access
-# 3. Copiar API key a frontend/.env.local → SENDGRID_API_KEY
-# 4. Configurar emails destino:
-#    - ADMIN_EMAIL (Dionizio)
-#    - DECANATURA_EMAIL (decanatura)
-#    - EMAIL_FROM (remitente)
+node scripts/migracion/02-load.mjs --solo-esquema
 ```
 
----
-
-## Fase 5: Frontend Build Local
-
-```bash
-cd frontend
-npm run build
-# Debe compilar sin errores
-
-# Si hay errores de tipo:
-npm run lint
-# Corregir antes de deploy
-```
+Para cargar datos desde un dump previo, ver `MIGRACION_NEON.md` §3.
 
 ---
 
-## Fase 6: Deploy a Vercel (E6)
+## 4. Producción (Vercel)
 
-```bash
-# Opción A: Vercel CLI
-cd frontend
-npx vercel
-# Seguir wizard → conectar proyecto
-
-# Opción B: GitHub + Vercel Dashboard
-# 1. Push del repo a GitHub
-# 2. Ir a https://vercel.com
-# 3. New Project > Import Git Repository
-# 4. Framework: Next.js
-# 5. Root Directory: frontend/
-# 6. Environment Variables: COPIAR TODAS las de .env.local
-```
-
-**Variables de entorno en Vercel Dashboard (Settings > Environment Variables):**
-
-| Variable | Entorno | Nota |
-|----------|---------|------|
-| `NEXT_PUBLIC_FIREBASE_API_KEY` | Production, Preview | Pública |
-| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Production, Preview | Pública |
-| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Production, Preview | Pública |
-| `NEXT_PUBLIC_FIREBASE_APP_ID` | Production, Preview | Pública |
-| `NEXT_PUBLIC_POLYGON_RPC_URL` | Production, Preview | Pública |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Production, Preview | Pública |
-| `NEXT_PUBLIC_EMAIL_REGEX` | Production, Preview | Pública |
-| `FIREBASE_CLIENT_EMAIL` | All | Secreta |
-| `FIREBASE_PRIVATE_KEY` | All | Secreta |
-| `FIREBASE_PROJECT_ID` | All | Secreta |
-| `POLYGON_RPC_URL` | All | Secreta (si incluye API key) |
-| `SERVER_PRIVATE_KEY` | All | **CRÍTICA** — nunca exponer |
-| `SERVER_WALLET_ADDRESS` | All | Secreta |
-| `SENDGRID_API_KEY` | All | Secreta |
-| `EMAIL_FROM` | All | Config |
-| `ADMIN_EMAIL` | All | Config |
-| `DECANATURA_EMAIL` | All | Config |
-
-> ⚠️ **CRÍTICO**: `SERVER_PRIVATE_KEY` es la llave que firma transacciones blockchain. Si se expone, alguien podría firmar préstamos fraudulentos. Trátala con el mismo cuidado que una contraseña bancaria.
+1. Importar el repositorio en Vercel. **Root Directory: `frontend`**.
+2. Cargar las variables de entorno (Production y Preview) — tabla completa en
+   `DEPLOY_VERCEL.md` §3.
+3. Deploy. La URL queda como `https://<proyecto>.vercel.app`.
+4. **Redeploy obligatorio** cada vez que se cambia una variable de entorno: los valores no se
+   aplican a deployments existentes.
 
 ---
 
-## Fase 7: Verificación Post-Deploy
+## 5. Verificación post-deploy
 
-1. ✅ Abrir la URL de Vercel (`.vercel.app`)
-2. ✅ Registrarse con correo institucional
-3. ✅ El administrador asigna rol "monitor" a un usuario de prueba
-4. ✅ Registrar un activo de prueba
-5. ✅ Generar QR y verificar que se muestra
-6. ✅ Crear bolsa de préstamo (estudiante)
-7. ✅ Aprobar préstamo (monitor)
-8. ✅ Verificar que aparece en Polygonscan Amoy
-9. ✅ Recibir correo de confirmación
-10. ✅ Devolver préstamo (monitor)
-11. ✅ Verificar que el activo vuelve a "Disponible"
+1. Login con una cuenta admin o monitor.
+2. `/inventario` muestra los activos (478 al momento de la migración).
+3. Solicitar un préstamo → aprobar → aparece el eslabón en `/trazabilidad`.
+4. Devolver → el activo vuelve a `disponible` y el préstamo a `devuelto`.
+5. Descargar un reporte (CSV) y comprobar acentos.
 
 ---
 
-## Fase 8: Mantenimiento Continuo
+## 6. Recordatorios push
 
-- **Cada mes**: Verificar balance de MATIC en la wallet server-side (el gas en testnet es gratis, pero monitorear).
-- **Cada semestre**: El administrador revisa monitores autorizados (RF-03).
-- **Antes de cada semestre**: Ejecutar migración de activos desde Excel actualizado (RO-03).
-- **Monitorear Firebase quota**: Dashboard > Usage — si se acerca al límite, usar RF-15 (exportar + limpiar).
+El workflow `.github/workflows/recordatorios-push.yml` corre a diario (13:00 UTC = 8:00 COT) y
+llama a `POST /api/cron/recordatorios` con el header `x-cron-secret`. Requiere dos secrets en
+GitHub → Settings → Secrets and variables → Actions:
+
+- `APP_URL` — URL de producción en Vercel
+- `CRON_SECRET` — el mismo valor de la variable de entorno
+
+Envía **una sola notificación por préstamo, el día antes de vencer**.
 
 ---
 
-## Rollback / Emergencia
+## 7. Mantenimiento
 
-Si algo falla en producción:
-1. Vercel Dashboard > Deployments > seleccionar último deploy funcional > "Promote to Production"
-2. Si es problema de blockchain: las transacciones ya registradas son inmutables (Regla 3), solo se pierden las pendientes en Firestore.
-3. Si es problema de Firebase: los datos están en Firestore; restaurar desde backup (Firebase console > Import/Export).
+- **Semanal:** `pg_dump` de respaldo (Neon Free no incluye PITR).
+- **Mensual:** revisar en Neon → Usage las CU-horas consumidas y el almacenamiento.
+- **Cada semestre:** revisar monitores autorizados y actualizar el inventario por CSV
+  (`scripts/importar-csv-v2.mjs`).
+- **Antes de cambios grandes:** `node scripts/migracion/03-verify.mjs`.
+
+---
+
+## 8. Notas
+
+- **Nunca** correr `npm run build` con `npm run dev` activo: comparten `.next` y se corrompe el
+  runtime del dev. Parar dev → build → re-arrancar.
+- Un solo dev server a la vez.
+- Los GET de datos vivos usan `export const dynamic = "force-dynamic"` para que Next 14 no los
+  cachee en producción.
